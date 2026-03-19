@@ -298,89 +298,92 @@ function JobPostsOnly({ jobs, search }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">CV Skill Extraction</div>
-            <div className="mt-1 text-sm text-slate-500">
-              Upload one candidate CV and extract GLiNER skills for Module 1.
-            </div>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-200/70">
+            <Sparkles className="h-5 w-5" />
           </div>
-          <Pill className="w-fit border border-sky-200 bg-sky-50 text-sky-700">
-            Module 1 API
-          </Pill>
+          <div>
+            <div className="text-base font-semibold tracking-tight text-slate-900">CV Skill Extraction</div>
+            {cvFile ? <div className="mt-1 text-xs font-medium text-slate-500">{cvFile.name} / {formatFileSize(cvFile.size)}</div> : null}
+          </div>
         </div>
 
-        <div className="mt-4 rounded-3xl border border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-5">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.docx,.txt"
-            className="hidden"
-            onChange={(event) => handleChooseFile(event.target.files?.[0] || null)}
-          />
+        <div className="mt-5 overflow-hidden rounded-[30px] border border-slate-200 bg-gradient-to-br from-slate-100 via-white to-sky-100 p-[1px]">
+          <div className="rounded-[29px] bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt"
+              className="hidden"
+              onChange={(event) => handleChooseFile(event.target.files?.[0] || null)}
+            />
 
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex w-full flex-col items-center justify-center rounded-3xl border border-white/80 bg-white/90 px-6 py-8 text-center shadow-sm transition hover:border-indigo-200 hover:bg-white"
-          >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
-              <Upload className="h-6 w-6" />
-            </div>
-            <div className="mt-4 text-base font-semibold text-slate-900">Upload CV</div>
-            <div className="mt-1 text-sm text-slate-500">PDF, DOCX, or TXT</div>
-            <div className="mt-3 text-xs font-medium text-indigo-600">Click to choose a file</div>
-          </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="group relative flex w-full flex-col items-center justify-center overflow-hidden rounded-[28px] border border-white/80 bg-white/95 px-6 py-10 text-center shadow-[0_20px_50px_-28px_rgba(79,70,229,0.45)] transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-white hover:shadow-[0_28px_70px_-30px_rgba(79,70,229,0.55)]"
+            >
+              <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-100 via-sky-100 to-cyan-100 text-indigo-700 transition group-hover:scale-105">
+                <Upload className="h-6 w-6" />
+              </div>
+              <div className="mt-5 text-lg font-semibold text-slate-900">{cvFile ? "Replace CV" : "Upload CV"}</div>
+              <div className="mt-2 text-sm text-slate-500">
+                {cvFile ? "Choose another file to refresh the extracted skills." : "PDF, DOCX, or TXT"}
+              </div>
+              <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700">
+                Choose file
+                <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+              </div>
+            </button>
 
-          {cvFile && (
-            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-                  <FileText className="h-5 w-5" />
+            {cvFile && (
+              <div className="mt-4 flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-white/95 p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">{cvFile.name}</div>
+                    <div className="text-xs text-slate-500">{formatFileSize(cvFile.size)}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">{cvFile.name}</div>
-                  <div className="text-xs text-slate-500">{formatFileSize(cvFile.size)}</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={resetCvUpload}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Clear
+                  </button>
+                  <Button
+                    onClick={handleExtractCvSkills}
+                    className="rounded-2xl bg-indigo-600 px-4 shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={cvLoading}
+                  >
+                    {cvLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Extracting
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Extract Skills
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={resetCvUpload}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Clear
-                </button>
-                <Button
-                  onClick={handleExtractCvSkills}
-                  className="rounded-2xl bg-indigo-600 px-4 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={cvLoading}
-                >
-                  {cvLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Extracting
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Extract Skills
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {cvError && (
-          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4">
             <div className="text-sm font-semibold text-rose-700">Skill extraction failed</div>
             <div className="mt-1 text-sm text-rose-600">{cvError}</div>
-            <div className="mt-2 text-xs text-rose-500">
-              Check the Module 1 backend URL: <code className="rounded bg-rose-100 px-1 py-0.5">{MODULE1_API_URL}</code>
-            </div>
           </div>
         )}
 
@@ -405,13 +408,9 @@ function JobPostsOnly({ jobs, search }) {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-slate-900">Extracted Skills</div>
-                {selected && (
-                  <Pill className="border border-indigo-200 bg-indigo-50 text-indigo-700">
-                    Selected job: {selected.title}
-                  </Pill>
-                )}
+                <div className="text-xs text-slate-500">{cvResult.filename || cvFile?.name}</div>
               </div>
 
               {extractedSkillSections.length === 0 ? (
