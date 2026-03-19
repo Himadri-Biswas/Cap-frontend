@@ -1,14 +1,83 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Calendar, CheckCircle2, Search, XCircle } from "lucide-react";
-import Input from "../../components/ui/Input.jsx";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowRight,
+  Calendar,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Sparkles,
+  Upload,
+  XCircle,
+} from "lucide-react";
+import Button from "../../components/ui/Button.jsx";
 import Pill from "../../components/ui/Pill.jsx";
-import SoftTag from "../../components/ui/SoftTag.jsx";
 import { cx } from "../../lib/cx.js";
 import { mockApplicantsByJob } from "./mockApplicantsByJob.js";
 
-function JobPostsOnly({ jobs, search, setSearch }) {
+const MODULE1_API_URL = import.meta.env.VITE_MODULE1_API_URL || "http://localhost:7860";
+
+const SKILL_CATEGORY_META = {
+  "programming language": {
+    label: "Programming Languages",
+    className: "border-blue-200 bg-blue-50 text-blue-700",
+  },
+  framework: {
+    label: "Frameworks and Libraries",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+  database: {
+    label: "Databases",
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+  },
+  "devops tool": {
+    label: "Cloud and DevOps",
+    className: "border-violet-200 bg-violet-50 text-violet-700",
+  },
+  "machine learning concept": {
+    label: "ML and AI Concepts",
+    className: "border-rose-200 bg-rose-50 text-rose-700",
+  },
+  "soft skill": {
+    label: "Soft Skills",
+    className: "border-slate-200 bg-slate-100 text-slate-700",
+  },
+  methodology: {
+    label: "Methodologies",
+    className: "border-teal-200 bg-teal-50 text-teal-700",
+  },
+};
+
+const SKILL_CATEGORY_ORDER = [
+  "programming language",
+  "framework",
+  "database",
+  "devops tool",
+  "machine learning concept",
+  "soft skill",
+  "methodology",
+];
+
+function formatFileSize(bytes) {
+  if (!bytes) return "0 KB";
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function formatCategoryLabel(category) {
+  return category
+    .split(" ")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function JobPostsOnly({ jobs, search }) {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
+  const [cvFile, setCvFile] = useState(null);
+  const [cvResult, setCvResult] = useState(null);
+  const [cvError, setCvError] = useState("");
+  const [cvLoading, setCvLoading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const now = new Date(Date.UTC(2026, 1, 10, 12, 0, 0)); // demo "today"
 
@@ -17,12 +86,12 @@ function JobPostsOnly({ jobs, search, setSearch }) {
     return new Date(Date.UTC(y, m - 1, d, 23, 59, 59));
   };
 
-  const normalizeSkill = (v = "") => v.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const normalizeSkill = (value = "") => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const isSkillMatch = (candidateSkill, requiredSkill) => {
-    const c = normalizeSkill(candidateSkill);
-    const r = normalizeSkill(requiredSkill);
-    if (!c || !r) return false;
-    return c === r || c.includes(r) || r.includes(c);
+    const candidate = normalizeSkill(candidateSkill);
+    const required = normalizeSkill(requiredSkill);
+    if (!candidate || !required) return false;
+    return candidate === required || candidate.includes(required) || required.includes(candidate);
   };
 
   const getApplicantCount = (jobId) => (mockApplicantsByJob[jobId] || []).length;
@@ -31,7 +100,7 @@ function JobPostsOnly({ jobs, search, setSearch }) {
     const requiredSkills = job?.skills || [];
     if (!requiredSkills.length) return { score: 0.5, matchedSkills: [], matchPct: 0 };
 
-    const matchedSkills = candidate.skills.filter((s) => requiredSkills.some((r) => isSkillMatch(s, r)));
+    const matchedSkills = candidate.skills.filter((skill) => requiredSkills.some((required) => isSkillMatch(skill, required)));
     const ratio = matchedSkills.length / requiredSkills.length;
     const score = Math.min(0.98, Math.max(0.45, 0.45 + ratio * 0.55));
     return {
@@ -42,39 +111,45 @@ function JobPostsOnly({ jobs, search, setSearch }) {
   };
 
   const filteredJobs = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const base = !q
+    const query = search.trim().toLowerCase();
+    const base = !query
       ? jobs
-      : jobs.filter((j) => `${j.title} ${j.dept} ${j.location}`.toLowerCase().includes(q));
+      : jobs.filter((job) => `${job.title} ${job.dept} ${job.location}`.toLowerCase().includes(query));
 
     return base
       .slice()
       .sort((a, b) => {
-        const aClo = deadlineUTC(a.deadline) < now;
-        const bClo = deadlineUTC(b.deadline) < now;
-        if (aClo !== bClo) return aClo ? 1 : -1;
+        const aClosed = deadlineUTC(a.deadline) < now;
+        const bClosed = deadlineUTC(b.deadline) < now;
+        if (aClosed !== bClosed) return aClosed ? 1 : -1;
         return deadlineUTC(b.deadline) - deadlineUTC(a.deadline);
       });
   }, [jobs, search]);
 
   useEffect(() => {
-    if (selectedJobId && !filteredJobs.find((j) => j.id === selectedJobId)) {
+    if (selectedJobId && !filteredJobs.find((job) => job.id === selectedJobId)) {
       setSelectedJobId(null);
       setSelectedCandidateId(null);
     }
   }, [filteredJobs, selectedJobId]);
 
-  const selected = selectedJobId ? filteredJobs.find((j) => j.id === selectedJobId) || null : null;
+  useEffect(() => {
+    if (!selectedJobId) {
+      setSelectedCandidateId(null);
+    }
+  }, [selectedJobId]);
+
+  const selected = selectedJobId ? filteredJobs.find((job) => job.id === selectedJobId) || null : null;
   const applicants = selected ? mockApplicantsByJob[selected.id] || [] : [];
 
   const rankedApplicants = useMemo(() => {
     if (!selected) return [];
     return applicants
-      .map((a) => {
-        const matched = scoreCandidate(a, selected);
-        const unmatched = a.skills.filter((s) => !matched.matchedSkills.includes(s));
+      .map((applicant) => {
+        const matched = scoreCandidate(applicant, selected);
+        const unmatched = applicant.skills.filter((skill) => !matched.matchedSkills.includes(skill));
         return {
-          ...a,
+          ...applicant,
           score: matched.score,
           matchPct: matched.matchPct,
           matchedSkills: matched.matchedSkills,
@@ -82,74 +157,137 @@ function JobPostsOnly({ jobs, search, setSearch }) {
         };
       })
       .sort((a, b) => b.score - a.score)
-      .map((a, idx) => ({ ...a, rank: idx + 1 }));
+      .map((applicant, index) => ({ ...applicant, rank: index + 1 }));
   }, [applicants, selected]);
 
-  useEffect(() => {
-    // Do not auto-select a candidate. Candidate details appear only after clicking a row.
-    if (!selectedJobId) {
-      setSelectedCandidateId(null);
-    }
-  }, [selectedJobId]);
+  const selectedCandidate = rankedApplicants.find((candidate) => candidate.id === selectedCandidateId) || null;
 
-  const selectedCandidate = rankedApplicants.find((c) => c.id === selectedCandidateId) || null;
+  const extractedSkillSections = useMemo(() => {
+    const categorized = cvResult?.categorized || {};
+    const knownSections = SKILL_CATEGORY_ORDER.filter((category) => categorized[category]?.length).map((category) => ({
+      category,
+      label: SKILL_CATEGORY_META[category]?.label || formatCategoryLabel(category),
+      className: SKILL_CATEGORY_META[category]?.className || "border-slate-200 bg-slate-50 text-slate-700",
+      items: categorized[category],
+    }));
+    const extraSections = Object.entries(categorized)
+      .filter(([category, items]) => !SKILL_CATEGORY_ORDER.includes(category) && items?.length)
+      .map(([category, items]) => ({
+        category,
+        label: formatCategoryLabel(category),
+        className: "border-slate-200 bg-slate-50 text-slate-700",
+        items,
+      }));
+    return [...knownSections, ...extraSections];
+  }, [cvResult]);
 
-  const statusPill = (j) => {
-    const isClo = deadlineUTC(j.deadline) < now;
-    return isClo
+  const statusPill = (job) => {
+    const isClosed = deadlineUTC(job.deadline) < now;
+    return isClosed
       ? { label: "Closed", cls: "bg-rose-50 text-rose-700 border-rose-200", icon: XCircle }
       : { label: "Ongoing", cls: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: CheckCircle2 };
   };
 
+  const module1Endpoint = `${MODULE1_API_URL.replace(/\/$/, "")}/extract-skills?mode=gliner`;
+
+  async function handleExtractCvSkills() {
+    if (!cvFile) return;
+
+    setCvLoading(true);
+    setCvError("");
+    setCvResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", cvFile);
+
+      const response = await fetch(module1Endpoint, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Module 1 API error ${response.status}`);
+      }
+
+      const data = await response.json();
+      setCvResult(data);
+    } catch (error) {
+      setCvError(error.message || "Failed to reach the Module 1 skill extraction API.");
+    } finally {
+      setCvLoading(false);
+    }
+  }
+
+  function handleChooseFile(file) {
+    if (!file) return;
+    setCvFile(file);
+    setCvError("");
+    setCvResult(null);
+  }
+
+  function resetCvUpload() {
+    setCvFile(null);
+    setCvResult(null);
+    setCvError("");
+    setCvLoading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
   const JobList = ({ compact }) => (
-    <div className={cx("rounded-3xl border border-slate-200 bg-white p-4 shadow-sm", compact && "h-fit")}> 
+    <div className={cx("rounded-3xl border border-slate-200 bg-white p-4 shadow-sm", compact && "h-fit")}>
       <div className="flex items-center justify-between">
         <div className="text-sm font-semibold text-slate-900">Latest Job Posts</div>
-        <Pill className="bg-slate-100 text-slate-700 border border-slate-200">{filteredJobs.length} job posts</Pill>
+        <Pill className="border border-slate-200 bg-slate-100 text-slate-700">{filteredJobs.length} job posts</Pill>
       </div>
 
       <div className="mt-3 space-y-3">
-        {filteredJobs.map((j) => {
-          const s = statusPill(j);
-          const Icon = s.icon;
-          const isSelected = selectedJobId === j.id;
+        {filteredJobs.map((job) => {
+          const status = statusPill(job);
+          const Icon = status.icon;
+          const isSelected = selectedJobId === job.id;
 
           return (
             <button
-              key={j.id}
+              key={job.id}
               onClick={() => {
-                setSelectedJobId(j.id);
+                setSelectedJobId(job.id);
                 setSelectedCandidateId(null);
               }}
               className={cx(
                 "w-full rounded-2xl border p-3 text-left transition",
                 isSelected
-                  ? "bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-200"
-                  : "bg-white hover:bg-slate-50 border-slate-200"
+                  ? "border-indigo-300 bg-indigo-50/80 ring-2 ring-indigo-200"
+                  : "border-slate-200 bg-white hover:bg-slate-50"
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div className={cx("mt-1 h-10 w-1.5 rounded-full", isSelected ? "bg-indigo-600" : "bg-slate-200")} />
                   <div>
-                    <div className="font-semibold text-slate-900">{j.title}</div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      {j.dept} • {j.location}
+                    <div className="font-semibold text-slate-900">{job.title}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {job.dept} / {job.location}
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <Pill className={cx("border", s.cls)}>
-                    <Icon className="h-3.5 w-3.5 mr-1" /> {s.label}
+                  <Pill className={cx("border", status.cls)}>
+                    <Icon className="mr-1 h-3.5 w-3.5" /> {status.label}
                   </Pill>
                 </div>
               </div>
 
               <div className="mt-2 flex flex-wrap gap-2">
-                <Pill className="bg-slate-100 text-slate-700 border border-slate-200">
-                  <Calendar className="h-3.5 w-3.5 mr-1" /> Deadline: {j.deadline}
+                <Pill className="border border-slate-200 bg-slate-100 text-slate-700">
+                  <Calendar className="mr-1 h-3.5 w-3.5" /> Deadline: {job.deadline}
                 </Pill>
-                <Pill className="bg-slate-100 text-slate-700 border border-slate-200">Applicants: {getApplicantCount(j.id)}</Pill>
+                <Pill className="border border-slate-200 bg-slate-100 text-slate-700">
+                  Applicants: {getApplicantCount(job.id)}
+                </Pill>
               </div>
             </button>
           );
@@ -160,30 +298,167 @@ function JobPostsOnly({ jobs, search, setSearch }) {
 
   return (
     <div className="space-y-4">
-      {/* Search for jobs */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <Search className="h-4 w-4 text-slate-500" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border-0 bg-transparent focus-visible:ring-0"
-            placeholder="Search jobs by title, dept, location..."
-          />
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">CV Skill Extraction</div>
+            <div className="mt-1 text-sm text-slate-500">
+              Upload one candidate CV and extract GLiNER skills for Module 1.
+            </div>
+          </div>
+          <Pill className="w-fit border border-sky-200 bg-sky-50 text-sky-700">
+            Module 1 API
+          </Pill>
         </div>
+
+        <div className="mt-4 rounded-3xl border border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-5">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.txt"
+            className="hidden"
+            onChange={(event) => handleChooseFile(event.target.files?.[0] || null)}
+          />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex w-full flex-col items-center justify-center rounded-3xl border border-white/80 bg-white/90 px-6 py-8 text-center shadow-sm transition hover:border-indigo-200 hover:bg-white"
+          >
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
+              <Upload className="h-6 w-6" />
+            </div>
+            <div className="mt-4 text-base font-semibold text-slate-900">Upload CV</div>
+            <div className="mt-1 text-sm text-slate-500">PDF, DOCX, or TXT</div>
+            <div className="mt-3 text-xs font-medium text-indigo-600">Click to choose a file</div>
+          </button>
+
+          {cvFile && (
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">{cvFile.name}</div>
+                  <div className="text-xs text-slate-500">{formatFileSize(cvFile.size)}</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={resetCvUpload}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Clear
+                </button>
+                <Button
+                  onClick={handleExtractCvSkills}
+                  className="rounded-2xl bg-indigo-600 px-4 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={cvLoading}
+                >
+                  {cvLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Extracting
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Extract Skills
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {cvError && (
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+            <div className="text-sm font-semibold text-rose-700">Skill extraction failed</div>
+            <div className="mt-1 text-sm text-rose-600">{cvError}</div>
+            <div className="mt-2 text-xs text-rose-500">
+              Check the Module 1 backend URL: <code className="rounded bg-rose-100 px-1 py-0.5">{MODULE1_API_URL}</code>
+            </div>
+          </div>
+        )}
+
+        {cvResult && !cvLoading && (
+          <div className="mt-4 space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs text-slate-500">Total skills</div>
+                <div className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{cvResult.total || 0}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs text-slate-500">Categories</div>
+                <div className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{extractedSkillSections.length}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs text-slate-500">Extractor</div>
+                <div className="mt-1 text-lg font-bold tracking-tight text-slate-900">
+                  {(cvResult.extractor || "gliner").toUpperCase()}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">{cvResult.filename || cvFile?.name}</div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-slate-900">Extracted Skills</div>
+                {selected && (
+                  <Pill className="border border-indigo-200 bg-indigo-50 text-indigo-700">
+                    Selected job: {selected.title}
+                  </Pill>
+                )}
+              </div>
+
+              {extractedSkillSections.length === 0 ? (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  No categorized skills were returned by the Module 1 backend for this CV.
+                </div>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  {extractedSkillSections.map((section) => (
+                    <div key={section.category}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">{section.label}</div>
+                        <div className="text-xs text-slate-500">{section.items.length} skills</div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {section.items.map((item) => (
+                          <span
+                            key={`${section.category}-${item.name}`}
+                            className={cx(
+                              "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium",
+                              section.className
+                            )}
+                          >
+                            <span>{item.name}</span>
+                            {typeof item.score === "number" && (
+                              <span className="font-mono opacity-70">{Math.round(item.score * 100)}%</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* IMPORTANT: no reserved columns. If no job selected, show only list full width. */}
       {!selected ? (
         <div>
           <JobList />
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[0.75fr_1.05fr_0.95fr]">
-          {/* Job list shrinks when selected */}
           <JobList compact />
 
-          {/* Job details */}
           <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-slate-900">Job Details</div>
@@ -203,17 +478,17 @@ function JobPostsOnly({ jobs, search, setSearch }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xl font-bold tracking-tight text-slate-900">{selected.title}</div>
-                  <div className="text-sm text-slate-500 mt-1">
-                    {selected.dept} • {selected.location}
+                  <div className="mt-1 text-sm text-slate-500">
+                    {selected.dept} / {selected.location}
                   </div>
                 </div>
                 <div className="text-right">
                   {(() => {
-                    const s = statusPill(selected);
-                    const Icon = s.icon;
+                    const status = statusPill(selected);
+                    const Icon = status.icon;
                     return (
-                      <Pill className={cx("border", s.cls)}>
-                        <Icon className="h-3.5 w-3.5 mr-1" /> {s.label}
+                      <Pill className={cx("border", status.cls)}>
+                        <Icon className="mr-1 h-3.5 w-3.5" /> {status.label}
                       </Pill>
                     );
                   })()}
@@ -221,21 +496,26 @@ function JobPostsOnly({ jobs, search, setSearch }) {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Summary</div>
-                <div className="text-sm text-slate-700 mt-2">{selected.summary}</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-700">Summary</div>
+                <div className="mt-2 text-sm text-slate-700">{selected.summary}</div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Key skills</div>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {selected.skills.map((s) => (
-                    <SoftTag key={s}>{s}</SoftTag>
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-700">Key skills</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selected.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700"
+                    >
+                      {skill}
+                    </span>
                   ))}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="grid gap-3 md:grid-cols-3 text-sm">
+                <div className="grid gap-3 text-sm md:grid-cols-3">
                   <div>
                     <div className="text-xs text-slate-500">Posted</div>
                     <div className="font-semibold text-slate-900">{selected.created}</div>
@@ -254,7 +534,7 @@ function JobPostsOnly({ jobs, search, setSearch }) {
               <div className="mt-4">
                 <button
                   type="button"
-                  className="w-full rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
                 >
                   View Job Details
                 </button>
@@ -262,11 +542,12 @@ function JobPostsOnly({ jobs, search, setSearch }) {
             </div>
           </div>
 
-          {/* Applicants */}
           <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-slate-900">Applicants</div>
-              <Pill className="bg-slate-100 text-slate-700 border border-slate-200">{rankedApplicants.length} applicants</Pill>
+              <Pill className="border border-slate-200 bg-slate-100 text-slate-700">
+                {rankedApplicants.length} applicants
+              </Pill>
             </div>
 
             {rankedApplicants.length === 0 ? (
@@ -279,45 +560,45 @@ function JobPostsOnly({ jobs, search, setSearch }) {
                   <table className="w-full text-sm">
                     <thead className="bg-slate-50">
                       <tr className="text-left text-slate-600">
-                        <th className="px-3 py-2 font-semibold w-14">Rank</th>
+                        <th className="w-14 px-3 py-2 font-semibold">Rank</th>
                         <th className="px-3 py-2 font-semibold">Candidate Name</th>
-                        <th className="px-3 py-2 font-semibold w-36">Candidate Score</th>
+                        <th className="w-36 px-3 py-2 font-semibold">Candidate Score</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {rankedApplicants.map((c) => {
-                        const isActive = c.id === selectedCandidateId;
+                      {rankedApplicants.map((candidate) => {
+                        const isActive = candidate.id === selectedCandidateId;
                         return (
                           <tr
-                            key={c.id}
+                            key={candidate.id}
                             className={cx(
                               "cursor-pointer border-t border-slate-200",
                               isActive ? "bg-indigo-50" : "hover:bg-slate-50"
                             )}
-                            onClick={() => setSelectedCandidateId(c.id)}
+                            onClick={() => setSelectedCandidateId(candidate.id)}
                           >
-                            <td className="px-3 py-2 font-mono text-slate-700">{c.rank}</td>
+                            <td className="px-3 py-2 font-mono text-slate-700">{candidate.rank}</td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white font-bold flex items-center justify-center">
-                                  {c.name
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 font-bold text-white">
+                                  {candidate.name
                                     .split(" ")
                                     .slice(0, 2)
-                                    .map((x) => x[0])
+                                    .map((part) => part[0])
                                     .join("")}
                                 </div>
-                                <div className="font-semibold text-slate-900">{c.name}</div>
+                                <div className="font-semibold text-slate-900">{candidate.name}</div>
                               </div>
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
-                                <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                                   <div
                                     className="h-full rounded-full bg-indigo-600"
-                                    style={{ width: `${Math.round(c.score * 100)}%` }}
+                                    style={{ width: `${Math.round(candidate.score * 100)}%` }}
                                   />
                                 </div>
-                                <span className="font-mono text-slate-700">{(c.score * 100).toFixed(0)}%</span>
+                                <span className="font-mono text-slate-700">{(candidate.score * 100).toFixed(0)}%</span>
                               </div>
                             </td>
                           </tr>
@@ -328,27 +609,25 @@ function JobPostsOnly({ jobs, search, setSearch }) {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  {!selectedCandidate ? (
-                    <></>
-                  ) : (
+                  {!selectedCandidate ? null : (
                     <div>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-base font-bold text-slate-900">{selectedCandidate.name}</div>
                         </div>
-                        <Pill className="bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        <Pill className="border border-indigo-200 bg-indigo-50 text-indigo-700">
                           Score: {(selectedCandidate.score * 100).toFixed(0)}%
                         </Pill>
                       </div>
 
                       <div className="mt-3">
-                        <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Skills</div>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-700">Skills</div>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {selectedCandidate.displaySkills.map((s) => {
-                            const isMatched = selectedCandidate.matchedSkills.includes(s);
+                          {selectedCandidate.displaySkills.map((skill) => {
+                            const isMatched = selectedCandidate.matchedSkills.includes(skill);
                             return (
                               <span
-                                key={s}
+                                key={skill}
                                 className={cx(
                                   "inline-flex items-center rounded-full border px-3 py-1 text-xs",
                                   isMatched
@@ -356,7 +635,7 @@ function JobPostsOnly({ jobs, search, setSearch }) {
                                     : "border-slate-200 bg-slate-50 text-slate-700"
                                 )}
                               >
-                                {s}
+                                {skill}
                               </span>
                             );
                           })}
@@ -366,7 +645,7 @@ function JobPostsOnly({ jobs, search, setSearch }) {
                       <div className="mt-4">
                         <button
                           type="button"
-                          className="w-full rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
                         >
                           View CV
                         </button>
