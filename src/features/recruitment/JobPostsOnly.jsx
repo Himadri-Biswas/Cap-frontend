@@ -14,7 +14,7 @@ import Pill from "../../components/ui/Pill.jsx";
 import { cx } from "../../lib/cx.js";
 import { mockApplicantsByJob } from "./mockApplicantsByJob.js";
 
-const MODULE1_API_URL = import.meta.env.VITE_MODULE1_API_URL || "http://localhost:7860";
+const MODULE1_API_URL = import.meta.env.VITE_MODULE1_API_URL || "https://ijsasif-module-1-skill-extractor.hf.space";
 
 const SKILL_CATEGORY_META = {
   "programming language": {
