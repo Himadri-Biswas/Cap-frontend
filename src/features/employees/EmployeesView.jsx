@@ -330,12 +330,7 @@ function EmployeesView({ employees, search, setSearch }) {
                   <div className="mt-1 text-sm text-white/80 font-medium">
                     Risk Level: {analysis.risk_tier}
                   </div>
-                  {analysis.primary_reason && analysis.primary_reason !== "N/A" && (
-                    <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-sm">
-                      <Zap className="h-3.5 w-3.5" />
-                      <span className="font-bold">{analysis.primary_reason}</span>
-                    </div>
-                  )}
+
                   <div className="mt-4 h-2 rounded-full bg-white/30 overflow-hidden">
                     <div
                       className="h-full rounded-full bg-white transition-all duration-700"
