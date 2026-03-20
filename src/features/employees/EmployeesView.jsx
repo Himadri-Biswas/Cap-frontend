@@ -333,7 +333,7 @@ function EmployeesView({ employees, search, setSearch }) {
                   {analysis.primary_reason && analysis.primary_reason !== "N/A" && (
                     <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-sm">
                       <Zap className="h-3.5 w-3.5" />
-                      Primary driver: <span className="font-bold">{analysis.primary_reason}</span>
+                      <span className="font-bold">{analysis.primary_reason}</span>
                     </div>
                   )}
                   <div className="mt-4 h-2 rounded-full bg-white/30 overflow-hidden">
@@ -345,31 +345,7 @@ function EmployeesView({ employees, search, setSearch }) {
                   <div className="mt-2 text-xs text-white/70">Company baseline: ~16%</div>
                 </div>
 
-                {/* Reason probabilities */}
-                {analysis.reason_probs && (
-                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="text-base font-bold text-slate-900 mb-3">Attrition Reason Likelihood</div>
-                    <div className="space-y-2">
-                      {Object.entries(analysis.reason_probs)
-                        .sort(([, a], [, b]) => b - a)
-                        .map(([reason, prob]) => {
-                          const pctReason = (prob * 100).toFixed(1);
-                          return (
-                            <div key={reason} className="flex items-center gap-3">
-                              <div className="w-28 text-xs text-slate-600 shrink-0">{reason}</div>
-                              <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-indigo-400 transition-all duration-500"
-                                  style={{ width: `${pctReason}%` }}
-                                />
-                              </div>
-                              <div className="w-12 text-right text-xs font-mono text-slate-700">{pctReason}%</div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                )}
+
 
                 {/* SHAP Top-5 */}
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
