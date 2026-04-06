@@ -1,3 +1,118 @@
+# TalentPulse-Bias-Aware Resume Screening(Module 1)
+TalentPulse predicts similarlity between a candidate's resume and the job description, while also providing bias-aware explanations to ensure fair hiring decisions.
+
+---
+    Currently ,We just implemented the CV Extraction ,in the next phase we will implement the bias-aware explainability and the similarity scoring using embeddings and cosine similarity.
+
+---
+
+### How It Works
+**CV Extraction**: We currently Use gliner model to extract skills from the candidate's resume. GLiner is a powerful tool for extracting structured information from unstructured text, making it ideal for parsing resumes and identifying relevant skills.
+Before we used BERT-based model for CV extraction but it was not performing well and was giving us bad results, so we switched to gliner and it is giving us much better results.
+
+We need to configure gliner levels more comprehensively to extract more skills and other relevant information from the resumes. 
+
+**Current Status**: Currently,We do this
+
+This module takes a resume and:
+
+1. Extracts readable text from the file
+2. Runs an AI model to detect skill entities
+3. Cleans and filters the extracted skills
+4. Returns a structured JSON response
+
+The result is a **reliable list of skills categorized by type**, along with confidence scores.
+
+---
+
+## Supported Resume Formats
+
+The API currently supports:
+
+- **PDF (.pdf)**
+- **Word documents (.docx)**
+- **Plain text (.txt)**
+
+Each file type is parsed and converted into normalized text before skill extraction begins. :contentReference[oaicite:0]{index=0}
+
+---
+
+## Skill Extraction Model
+
+The system uses **GLiNER**, a general-purpose named entity recognition model that performs well for domain-specific entity extraction.
+
+It identifies skills across categories such as:
+
+- Programming Languages
+- Frameworks
+- Databases
+- DevOps Tools
+- Machine Learning Concepts
+- Soft Skills
+- Methodologies
+We need to configure gliner levels more comprehensively to extract more skills and other relevant information from the resumes.
+
+Each detected skill is returned with:
+
+- its **name**
+- its **category**
+- a **confidence score**
+
+Low-confidence predictions are filtered using a configurable threshold to ensure higher quality results. :contentReference[oaicite:1]{index=1}
+
+---
+
+## Cleaning and Normalizing Skills
+
+Model predictions can sometimes include noise or inconsistent formatting.  
+To improve quality, the system performs several cleanup steps before returning results:
+
+- Removing punctuation artifacts
+- Normalizing whitespace
+- Converting skill names to lowercase
+- Filtering common non-skill words
+- Removing numeric-only entities
+- Ignoring extremely long phrases
+
+These steps ensure the final output contains **clean and meaningful skill names**.
+
+---
+
+## Handling Long Resumes
+
+Some resumes are very long and may exceed the model's optimal input size.
+
+To handle this efficiently:
+
+- The resume text is split into **smaller chunks**
+- Each chunk is analyzed separately
+- Detected skills are merged afterward
+- The **highest confidence score** for each skill is retained
+
+This allows the system to process long resumes **without losing accuracy**. :contentReference[oaicite:2]{index=2}
+
+---
+
+## Example Response
+
+A typical response looks like this:
+
+```json
+{
+  "filename": "resume.pdf",
+  "extractor": "gliner",
+  "total": 8,
+  "skills": [
+    {"name": "python", "category": "programming language", "score": 0.94},
+    {"name": "pytorch", "category": "framework", "score": 0.88},
+    {"name": "docker", "category": "devops tool", "score": 0.81}
+  ]
+}
+ 
+
+
+
+
 # TalentPulse — Employee Attrition Prediction (Module 3)
 
 TalentPulse predicts the likelihood of an employee leaving the company and explains *why* and *what can be done about it* — all in real time.
