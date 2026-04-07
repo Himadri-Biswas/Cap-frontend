@@ -7,10 +7,10 @@ TalentPulse predicts similarlity between a candidate's resume and the job descri
 ---
 
 ### How It Works
-**CV Extraction**: We currently Use gliner model to extract skills from the candidate's resume. GLiner is a powerful tool for extracting structured information from unstructured text, making it ideal for parsing resumes and identifying relevant skills.
-Before we used BERT-based model for CV extraction but it was not performing well and was giving us bad results, so we switched to gliner and it is giving us much better results.
+**CV Extraction**: We currently Use gliner and BERT model in combination to extract skills from the candidate's resume. GLiner is a powerful tool for extracting structured information from unstructured text, making it ideal for parsing resumes and identifying relevant skills.
+Before we used only BERT-based model for CV extraction but it was not performing well and was giving us bad results, so we switched to gliner and it is giving us much better results.
 
-We need to configure gliner levels more comprehensively to extract more skills and other relevant information from the resumes. 
+We need to configure gliner levels more comprehensively and train BERT using more varied data to extract more skills and other relevant information from the resumes. 
 
 **Current Status**: Currently,We do this
 
@@ -39,9 +39,7 @@ Each file type is parsed and converted into normalized text before skill extract
 
 ## Skill Extraction Model
 
-The system uses **GLiNER**, a general-purpose named entity recognition model that performs well for domain-specific entity extraction.
-
-It identifies skills across categories such as:
+The system  identifies skills across categories such as:
 
 - Programming Languages
 - Frameworks
@@ -50,7 +48,7 @@ It identifies skills across categories such as:
 - Machine Learning Concepts
 - Soft Skills
 - Methodologies
-We need to configure gliner levels more comprehensively to extract more skills and other relevant information from the resumes.
+We need to configure gliner levels more comprehensively and fine tuning bert  to extract more skills and other relevant information from the resumes.
 
 Each detected skill is returned with:
 
