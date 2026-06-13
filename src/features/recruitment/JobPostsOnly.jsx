@@ -6,10 +6,8 @@ import {
   CheckCircle2,
   FileText,
   Loader2,
-  Plus,
   ShieldCheck,
   Sparkles,
-  Trash2,
   Upload,
   UsersRound,
   XCircle,
@@ -25,12 +23,6 @@ const MODULE1_RANKING_API_URL =
 
 const DEFAULT_RANKING_JD =
   "We are seeking a Data Analyst to analyze business data, build dashboards, and generate actionable insights. Requirements: 3+ years of Python, SQL, data visualization experience. Familiarity with pandas, scikit-learn, Tableau. Strong analytical and communication skills.";
-
-const UNIVERSITY_OPTIONS = ["BUET", "DU", "BRAC University", "CUET", "RUET", "KUET", "SUST", "JU", "NSU", "Daffodil", "National Univ"];
-const TIER_OPTIONS = ["Tier 1", "Tier 2", "Tier 3"];
-const GENDER_OPTIONS = ["Male", "Female"];
-const SKIN_OPTIONS = ["Fair", "Medium", "Dark"];
-const ETHNICITY_OPTIONS = ["Bengali", "Chakma", "Marma", "Garo", "Manipuri", "Santal"];
 
 const SKILL_CATEGORY_META = {
   "programming language": {
@@ -86,21 +78,6 @@ function formatCategoryLabel(category) {
     .join(" ");
 }
 
-function createRankingCandidate(index) {
-  return {
-    id: `candidate-${index}`,
-    name: "",
-    file: null,
-    demographics: {
-      university: UNIVERSITY_OPTIONS[0],
-      university_tier: TIER_OPTIONS[0],
-      gender: GENDER_OPTIONS[0],
-      skin_color: SKIN_OPTIONS[0],
-      ethnicity: ETHNICITY_OPTIONS[0],
-    },
-  };
-}
-
 function formatScore(value) {
   return typeof value === "number" ? value.toFixed(4) : "-";
 }
@@ -114,11 +91,14 @@ function JobPostsOnly({ jobs, search }) {
   const [cvLoading, setCvLoading] = useState(false);
   const [rankingJobTitle, setRankingJobTitle] = useState("Data Analyst");
   const [rankingJobDescription, setRankingJobDescription] = useState(DEFAULT_RANKING_JD);
-  const [rankingCandidates, setRankingCandidates] = useState([createRankingCandidate(1), createRankingCandidate(2)]);
+  const [rankingJdFile, setRankingJdFile] = useState(null);
+  const [rankingCvFiles, setRankingCvFiles] = useState([]);
   const [rankingResult, setRankingResult] = useState(null);
   const [rankingError, setRankingError] = useState("");
   const [rankingLoading, setRankingLoading] = useState(false);
   const fileInputRef = useRef(null);
+  const rankingJdInputRef = useRef(null);
+  const rankingCvInputRef = useRef(null);
 
   const now = new Date(Date.UTC(2026, 1, 10, 12, 0, 0)); // demo "today"
 
@@ -279,44 +259,48 @@ function JobPostsOnly({ jobs, search }) {
     }
   }
 
-  function updateRankingCandidate(id, field, value) {
-    setRankingCandidates((current) =>
-      current.map((candidate) => (candidate.id === id ? { ...candidate, [field]: value } : candidate))
-    );
+  function handleRankingCvFiles(files) {
+    const nextFiles = Array.from(files || []);
+    if (!nextFiles.length) return;
+    setRankingCvFiles((current) => {
+      const seen = new Set(current.map((file) => `${file.name}-${file.size}-${file.lastModified}`));
+      const unique = nextFiles.filter((file) => {
+        const key = `${file.name}-${file.size}-${file.lastModified}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return [...current, ...unique];
+    });
+    setRankingError("");
+    setRankingResult(null);
   }
 
-  function updateRankingDemographics(id, field, value) {
-    setRankingCandidates((current) =>
-      current.map((candidate) =>
-        candidate.id === id
-          ? {
-              ...candidate,
-              demographics: { ...candidate.demographics, [field]: value },
-            }
-          : candidate
-      )
-    );
+  function removeRankingCvFile(fileToRemove) {
+    setRankingCvFiles((current) => current.filter((file) => file !== fileToRemove));
+    setRankingResult(null);
   }
 
-  function addRankingCandidate() {
-    setRankingCandidates((current) => [...current, createRankingCandidate(Date.now())]);
-  }
-
-  function removeRankingCandidate(id) {
-    setRankingCandidates((current) => (current.length > 1 ? current.filter((candidate) => candidate.id !== id) : current));
+  function resetRankingUpload() {
+    setRankingJdFile(null);
+    setRankingCvFiles([]);
+    setRankingResult(null);
+    setRankingError("");
+    setRankingLoading(false);
+    if (rankingJdInputRef.current) rankingJdInputRef.current.value = "";
+    if (rankingCvInputRef.current) rankingCvInputRef.current.value = "";
   }
 
   async function handleRankCandidates() {
     setRankingError("");
     setRankingResult(null);
 
-    const readyCandidates = rankingCandidates.filter((candidate) => candidate.file);
-    if (!rankingJobDescription.trim()) {
-      setRankingError("Job description is required.");
+    if (!rankingJobDescription.trim() && !rankingJdFile) {
+      setRankingError("Paste a job description or upload a JD file.");
       return;
     }
-    if (!readyCandidates.length) {
-      setRankingError("Upload at least one candidate CV.");
+    if (!rankingCvFiles.length) {
+      setRankingError("Upload at least one structured candidate CV.");
       return;
     }
 
@@ -325,18 +309,11 @@ function JobPostsOnly({ jobs, search }) {
       const formData = new FormData();
       formData.append("job_title", rankingJobTitle.trim() || "Untitled Role");
       formData.append("job_description", rankingJobDescription.trim());
-      formData.append(
-        "candidates_json",
-        JSON.stringify(
-          readyCandidates.map((candidate, index) => ({
-            id: candidate.id || `candidate-${index + 1}`,
-            name: candidate.name.trim() || candidate.file.name.replace(/\.[^/.]+$/, ""),
-            demographics: candidate.demographics,
-          }))
-        )
-      );
-      readyCandidates.forEach((candidate) => {
-        formData.append("files", candidate.file);
+      if (rankingJdFile) {
+        formData.append("jd_file", rankingJdFile);
+      }
+      rankingCvFiles.forEach((file) => {
+        formData.append("files", file);
       });
 
       const response = await fetch(rankingEndpoint, {
@@ -589,8 +566,8 @@ function JobPostsOnly({ jobs, search }) {
           )}
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="space-y-3">
+        <div className="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="space-y-4">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Job title</span>
               <input
@@ -600,119 +577,188 @@ function JobPostsOnly({ jobs, search }) {
               />
             </label>
 
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Job description</span>
+            <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
+              <input
+                ref={rankingJdInputRef}
+                type="file"
+                accept=".pdf,.docx,.txt"
+                className="hidden"
+                onChange={(event) => {
+                  setRankingJdFile(event.target.files?.[0] || null);
+                  setRankingResult(null);
+                  setRankingError("");
+                }}
+              />
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Job Description</div>
+                  <div className="mt-1 text-xs text-slate-500">Upload JD or paste text below.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => rankingJdInputRef.current?.click()}
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Upload JD
+                </button>
+              </div>
+
+              {rankingJdFile && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-900">{rankingJdFile.name}</div>
+                    <div className="text-xs text-slate-500">{formatFileSize(rankingJdFile.size)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRankingJdFile(null);
+                      if (rankingJdInputRef.current) rankingJdInputRef.current.value = "";
+                    }}
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+
               <textarea
                 value={rankingJobDescription}
-                onChange={(event) => setRankingJobDescription(event.target.value)}
-                rows={9}
-                className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-slate-400"
+                onChange={(event) => {
+                  setRankingJobDescription(event.target.value);
+                  setRankingResult(null);
+                }}
+                rows={8}
+                placeholder="Paste job description here if no JD file is uploaded..."
+                className="mt-3 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-slate-400"
               />
-            </label>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+            <input
+              ref={rankingCvInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt"
+              multiple
+              className="hidden"
+              onChange={(event) => handleRankingCvFiles(event.target.files)}
+            />
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <UsersRound className="h-4 w-4 text-slate-500" />
-                Candidates
+                Candidate CVs
               </div>
               <button
                 type="button"
-                onClick={addRankingCandidate}
-                className="inline-flex items-center gap-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => rankingCvInputRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
               >
-                <Plus className="h-3.5 w-3.5" />
-                Add
+                <Upload className="h-3.5 w-3.5" />
+                Upload CVs
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
-              {rankingCandidates.map((candidate, index) => (
-                <div key={candidate.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-                      {index + 1}
-                    </div>
-                    <div className="grid flex-1 gap-3 md:grid-cols-2">
-                      <input
-                        value={candidate.name}
-                        onChange={(event) => updateRankingCandidate(candidate.id, "name", event.target.value)}
-                        placeholder="Candidate name"
-                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-slate-400"
-                      />
-                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
-                        <span className="truncate">{candidate.file ? candidate.file.name : "Upload CV"}</span>
-                        <Upload className="h-4 w-4 shrink-0 text-slate-500" />
-                        <input
-                          type="file"
-                          accept=".pdf,.docx,.txt"
-                          className="hidden"
-                          onChange={(event) => updateRankingCandidate(candidate.id, "file", event.target.files?.[0] || null)}
-                        />
-                      </label>
+            <button
+              type="button"
+              onClick={() => rankingCvInputRef.current?.click()}
+              className="group mt-4 flex min-h-[210px] w-full flex-col items-center justify-center rounded-[26px] border border-dashed border-slate-300 bg-white px-6 py-8 text-center transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-lg hover:shadow-slate-200/60"
+            >
+              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-slate-900 text-white transition group-hover:scale-105">
+                <Upload className="h-5 w-5" />
+              </div>
+              <div className="mt-4 text-base font-semibold text-slate-900">Upload structured CV files</div>
+              <div className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+                CVs should include labels like Name, University, University Tier, Gender, Skin Color, and Ethnicity.
+              </div>
+              <div className="mt-4 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700">
+                PDF, DOCX, or TXT / multiple files
+              </div>
+            </button>
+
+            {rankingCvFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {rankingCvFiles.map((file, index) => (
+                  <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+                        {index + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-900">{file.name}</div>
+                        <div className="text-xs text-slate-500">{formatFileSize(file.size)}</div>
+                      </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeRankingCandidate(candidate.id)}
-                      className="rounded-full p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                      aria-label="Remove candidate"
+                      onClick={() => removeRankingCvFile(file)}
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      Remove
                     </button>
                   </div>
-
-                  <div className="mt-3 grid gap-2 md:grid-cols-5">
-                    {[
-                      ["university", UNIVERSITY_OPTIONS],
-                      ["university_tier", TIER_OPTIONS],
-                      ["gender", GENDER_OPTIONS],
-                      ["skin_color", SKIN_OPTIONS],
-                      ["ethnicity", ETHNICITY_OPTIONS],
-                    ].map(([field, options]) => (
-                      <select
-                        key={field}
-                        value={candidate.demographics[field]}
-                        onChange={(event) => updateRankingDemographics(candidate.id, field, event.target.value)}
-                        className="min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 outline-none focus:border-slate-400"
-                      >
-                        {options.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               {rankingError ? <div className="text-sm font-medium text-rose-600">{rankingError}</div> : <div />}
-              <Button
-                onClick={handleRankCandidates}
-                className="rounded-2xl bg-slate-900 px-4 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={rankingLoading}
-              >
-                {rankingLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Ranking
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Rank Candidates
-                  </>
-                )}
-              </Button>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={resetRankingUpload}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Clear
+                </button>
+                <Button
+                  onClick={handleRankCandidates}
+                  className="rounded-2xl bg-slate-900 px-4 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={rankingLoading}
+                >
+                  {rankingLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Ranking
+                    </>
+                  ) : (
+                    <>
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Extract & Rank
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
 
         {rankingResult && (
           <div className="mt-5 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="text-sm font-semibold text-slate-900">Parsed Candidate Profiles</div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {rankingResult.candidates?.map((candidate) => (
+                  <div key={candidate.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="font-semibold text-slate-900">{candidate.name}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {[
+                        candidate.demographics?.university,
+                        candidate.demographics?.university_tier,
+                        candidate.demographics?.gender,
+                        candidate.demographics?.skin_color,
+                        candidate.demographics?.ethnicity,
+                      ].map((value, valueIndex) => (
+                        <Pill key={`${candidate.id}-${valueIndex}-${value || "unknown"}`} className="border border-slate-200 bg-white text-slate-700">
+                          {value || "Unknown"}
+                        </Pill>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-xs text-slate-500">Before spread</div>
