@@ -21,8 +21,11 @@ const MODULE1_API_URL = import.meta.env.VITE_MODULE1_API_URL || "https://ijsasif
 const MODULE1_RANKING_API_URL =
   import.meta.env.VITE_MODULE1_RANKING_API_URL || "https://ijsasif-module-1-ranking-debiasing.hf.space";
 
-const DEFAULT_RANKING_JD =
-  "We are seeking a Data Analyst to analyze business data, build dashboards, and generate actionable insights. Requirements: 3+ years of Python, SQL, data visualization experience. Familiarity with pandas, scikit-learn, Tableau. Strong analytical and communication skills.";
+function titleFromFilename(filename) {
+  const noExt = filename.replace(/\.[^/.]+$/, "");
+  const noNum = noExt.replace(/^\d+[_\-\s]+/, "");
+  return noNum.replace(/[_\-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+}
 
 const SKILL_CATEGORY_META = {
   "programming language":                  { label: "Languages",     className: "border-blue-200 bg-blue-50 text-blue-700" },
@@ -99,8 +102,8 @@ function JobPostsOnly({ jobs, search }) {
   const [cvResult, setCvResult] = useState(null);
   const [cvError, setCvError] = useState("");
   const [cvLoading, setCvLoading] = useState(false);
-  const [rankingJobTitle, setRankingJobTitle] = useState("Data Analyst");
-  const [rankingJobDescription, setRankingJobDescription] = useState(DEFAULT_RANKING_JD);
+  const [rankingJobTitle, setRankingJobTitle] = useState("");
+  const [rankingJobDescription, setRankingJobDescription] = useState("");
   const [rankingJdFile, setRankingJdFile] = useState(null);
   const [rankingCvFiles, setRankingCvFiles] = useState([]);
   const [rankingResult, setRankingResult] = useState(null);
@@ -321,6 +324,8 @@ function JobPostsOnly({ jobs, search }) {
   }
 
   function resetRankingUpload() {
+    setRankingJobTitle("");
+    setRankingJobDescription("");
     setRankingJdFile(null);
     setRankingCvFiles([]);
     setRankingResult(null);
@@ -347,7 +352,10 @@ function JobPostsOnly({ jobs, search }) {
       });
       if (r.ok) {
         const data = await r.json();
-        if (data.text?.trim()) setRankingJobDescription(data.text.trim());
+          if (data.text?.trim()) {
+        setRankingJobDescription(data.text.trim());
+        setRankingJobTitle((prev) => prev.trim() || titleFromFilename(file.name));
+      }
       }
     } catch {
       // best-effort — user can still paste manually
@@ -652,8 +660,6 @@ function JobPostsOnly({ jobs, search }) {
                   <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
                     {jdExtracting ? (
                       <><Loader2 className="h-3 w-3 animate-spin" /> Extracting text…</>
-                    ) : rankingJdFile ? (
-                      <><FileText className="h-3 w-3 text-emerald-500" /><span>From <span className="font-medium text-slate-700">{rankingJdFile.name}</span> · edit below if needed</span></>
                     ) : (
                       "Upload JD or paste text below."
                     )}
@@ -672,7 +678,8 @@ function JobPostsOnly({ jobs, search }) {
                       type="button"
                       onClick={() => {
                         setRankingJdFile(null);
-                        setRankingJobDescription(DEFAULT_RANKING_JD);
+                        setRankingJobTitle("");
+                        setRankingJobDescription("");
                       }}
                       className="text-xs font-semibold text-rose-600 hover:text-rose-700"
                     >
