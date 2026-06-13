@@ -626,8 +626,8 @@ function JobPostsOnly({ jobs, search }) {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-base font-semibold tracking-tight text-slate-900">Candidate Ranking</div>
-              <div className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Before / after debiasing</div>
+              <div className="text-base font-semibold tracking-tight text-slate-900">Fair Candidate Screener</div>
+              <div className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Skill-matched · Bias-corrected</div>
             </div>
           </div>
         </div>
@@ -658,13 +658,11 @@ function JobPostsOnly({ jobs, search }) {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-slate-900">Job Description</div>
-                  <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                    {jdExtracting ? (
-                      <><Loader2 className="h-3 w-3 animate-spin" /> Extracting text…</>
-                    ) : (
-                      "Upload JD or paste text below."
-                    )}
-                  </div>
+                  {jdExtracting && (
+                    <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Extracting text…
+                    </div>
+                  )}
                 </div>
                 {rankingJdFile ? (
                   <div className="flex shrink-0 items-center gap-3">
