@@ -355,7 +355,7 @@ function JobPostsOnly({ jobs, search }) {
         const data = await r.json();
           if (data.text?.trim()) {
         setRankingJobDescription(data.text.trim());
-        setRankingJobTitle((prev) => prev.trim() || titleFromFilename(file.name));
+        setRankingJobTitle(titleFromFilename(file.name));
       }
       }
     } catch {
@@ -1050,6 +1050,64 @@ function JobPostsOnly({ jobs, search }) {
               </div>
             </div>
 
+            {/* Bias Breakdown per Candidate */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="mb-4 text-sm font-semibold text-slate-900">Bias Breakdown per Candidate</div>
+              <div className="space-y-3">
+                {rankingResult.candidates?.map((candidate) => {
+                  const adj = candidate.step1_biased?.demographic_adjustments;
+                  const total = adj?.total ?? 0;
+                  const biasRemovedPct = candidate.bias_analysis?.bias_removed_pct ?? 0;
+                  const isPriv = candidate.bias_analysis?.was_privileged;
+                  const isDis = candidate.bias_analysis?.was_disadvantaged;
+                  return (
+                    <div key={candidate.id} className={cx(
+                      "rounded-xl border p-3",
+                      isPriv ? "border-amber-200 bg-amber-50/30" : isDis ? "border-rose-200 bg-rose-50/30" : "border-slate-200 bg-slate-50"
+                    )}>
+                      <div className="mb-2.5 flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-slate-900">{candidate.name}</span>
+                        <span className={cx(
+                          "rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                          biasRemovedPct >= 60 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : biasRemovedPct >= 30 ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-slate-200 bg-slate-100 text-slate-500"
+                        )}>
+                          {biasRemovedPct}% bias removed
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { label: "University", val: adj?.university },
+                          { label: "Gender", val: adj?.gender },
+                          { label: "Skin Color", val: adj?.skin_color },
+                          { label: "Ethnicity", val: adj?.ethnicity },
+                        ].map(({ label, val }) => (
+                          <div key={label} className={cx(
+                            "rounded-xl border px-2 py-2 text-center",
+                            val > 0 ? "border-amber-200 bg-amber-50 text-amber-700"
+                            : val < 0 ? "border-rose-200 bg-rose-50 text-rose-700"
+                            : "border-slate-200 bg-white text-slate-400"
+                          )}>
+                            <div className="text-[10px] font-medium">{label}</div>
+                            <div className="mt-0.5 font-mono text-xs font-bold">
+                              {val > 0 ? "+" : ""}{(val ?? 0).toFixed(2)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Total adjustment applied by biased model</span>
+                        <span className={cx("font-mono font-semibold", total > 0 ? "text-amber-600" : total < 0 ? "text-rose-600" : "text-slate-400")}>
+                          {total > 0 ? "+" : ""}{total.toFixed(3)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Skill Analysis */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5">
               <div className="mb-4 flex items-center justify-between">
@@ -1142,19 +1200,8 @@ function JobPostsOnly({ jobs, search }) {
                                 isPriv ? "border-amber-200 bg-amber-50/30" : isDis ? "border-rose-200 bg-rose-50/30" : "border-slate-200 bg-slate-50"
                               )}
                             >
-                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-slate-900">{candidate.name}</span>
-                                  <span className="text-xs text-slate-400">Rank #{candidate.step2_fair?.rank}</span>
-                                </div>
-                                <span className={cx(
-                                  "rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                                  matchPct >= 70 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                  : matchPct >= 40 ? "border-amber-200 bg-amber-50 text-amber-700"
-                                  : "border-rose-200 bg-rose-50 text-rose-700"
-                                )}>
-                                  {matched.length}/{jdNames.length} required · {matchPct}%
-                                </span>
+                              <div className="mb-2">
+                                <span className="font-semibold text-slate-900">{candidate.name}</span>
                               </div>
                               {candidateSkillSections.length === 0 ? (
                                 <div className="rounded-xl border border-slate-100 bg-white/70 p-3 text-xs text-slate-400">
