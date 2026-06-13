@@ -23,8 +23,9 @@ const MODULE1_RANKING_API_URL =
 
 function titleFromFilename(filename) {
   const noExt = filename.replace(/\.[^/.]+$/, "");
-  const noNum = noExt.replace(/^\d+[_\-\s]+/, "");
-  return noNum.replace(/[_\-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+  const noPrefix = noExt.replace(/^(\d+|jd)[_\-\s]+/i, "");
+  const noSuffix = noPrefix.replace(/[_\-\s]+(jd|position|role|description)$/i, "");
+  return noSuffix.replace(/[_\-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
 }
 
 const SKILL_CATEGORY_META = {
