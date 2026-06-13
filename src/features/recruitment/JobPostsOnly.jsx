@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
+  BarChart3,
   Calendar,
   CheckCircle2,
   FileText,
   Loader2,
+  Plus,
+  ShieldCheck,
   Sparkles,
+  Trash2,
   Upload,
+  UsersRound,
   XCircle,
 } from "lucide-react";
 import Button from "../../components/ui/Button.jsx";
@@ -15,6 +20,17 @@ import { cx } from "../../lib/cx.js";
 import { mockApplicantsByJob } from "./mockApplicantsByJob.js";
 
 const MODULE1_API_URL = import.meta.env.VITE_MODULE1_API_URL || "https://ijsasif-module-1-skill-extractor.hf.space";
+const MODULE1_RANKING_API_URL =
+  import.meta.env.VITE_MODULE1_RANKING_API_URL || "https://ijsasif-module-1-ranking-debiasing.hf.space";
+
+const DEFAULT_RANKING_JD =
+  "We are seeking a Data Analyst to analyze business data, build dashboards, and generate actionable insights. Requirements: 3+ years of Python, SQL, data visualization experience. Familiarity with pandas, scikit-learn, Tableau. Strong analytical and communication skills.";
+
+const UNIVERSITY_OPTIONS = ["BUET", "DU", "BRAC University", "CUET", "RUET", "KUET", "SUST", "JU", "NSU", "Daffodil", "National Univ"];
+const TIER_OPTIONS = ["Tier 1", "Tier 2", "Tier 3"];
+const GENDER_OPTIONS = ["Male", "Female"];
+const SKIN_OPTIONS = ["Fair", "Medium", "Dark"];
+const ETHNICITY_OPTIONS = ["Bengali", "Chakma", "Marma", "Garo", "Manipuri", "Santal"];
 
 const SKILL_CATEGORY_META = {
   "programming language": {
@@ -70,6 +86,25 @@ function formatCategoryLabel(category) {
     .join(" ");
 }
 
+function createRankingCandidate(index) {
+  return {
+    id: `candidate-${index}`,
+    name: "",
+    file: null,
+    demographics: {
+      university: UNIVERSITY_OPTIONS[0],
+      university_tier: TIER_OPTIONS[0],
+      gender: GENDER_OPTIONS[0],
+      skin_color: SKIN_OPTIONS[0],
+      ethnicity: ETHNICITY_OPTIONS[0],
+    },
+  };
+}
+
+function formatScore(value) {
+  return typeof value === "number" ? value.toFixed(4) : "-";
+}
+
 function JobPostsOnly({ jobs, search }) {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
@@ -77,6 +112,12 @@ function JobPostsOnly({ jobs, search }) {
   const [cvResult, setCvResult] = useState(null);
   const [cvError, setCvError] = useState("");
   const [cvLoading, setCvLoading] = useState(false);
+  const [rankingJobTitle, setRankingJobTitle] = useState("Data Analyst");
+  const [rankingJobDescription, setRankingJobDescription] = useState(DEFAULT_RANKING_JD);
+  const [rankingCandidates, setRankingCandidates] = useState([createRankingCandidate(1), createRankingCandidate(2)]);
+  const [rankingResult, setRankingResult] = useState(null);
+  const [rankingError, setRankingError] = useState("");
+  const [rankingLoading, setRankingLoading] = useState(false);
   const fileInputRef = useRef(null);
 
   const now = new Date(Date.UTC(2026, 1, 10, 12, 0, 0)); // demo "today"
@@ -189,6 +230,7 @@ function JobPostsOnly({ jobs, search }) {
   };
 
   const module1Endpoint = `${MODULE1_API_URL.replace(/\/$/, "")}/extract-skills?mode=gliner`;
+  const rankingEndpoint = `${MODULE1_RANKING_API_URL.replace(/\/$/, "")}/rank-candidates/upload`;
 
   async function handleExtractCvSkills() {
     if (!cvFile) return;
@@ -234,6 +276,85 @@ function JobPostsOnly({ jobs, search }) {
     setCvLoading(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  }
+
+  function updateRankingCandidate(id, field, value) {
+    setRankingCandidates((current) =>
+      current.map((candidate) => (candidate.id === id ? { ...candidate, [field]: value } : candidate))
+    );
+  }
+
+  function updateRankingDemographics(id, field, value) {
+    setRankingCandidates((current) =>
+      current.map((candidate) =>
+        candidate.id === id
+          ? {
+              ...candidate,
+              demographics: { ...candidate.demographics, [field]: value },
+            }
+          : candidate
+      )
+    );
+  }
+
+  function addRankingCandidate() {
+    setRankingCandidates((current) => [...current, createRankingCandidate(Date.now())]);
+  }
+
+  function removeRankingCandidate(id) {
+    setRankingCandidates((current) => (current.length > 1 ? current.filter((candidate) => candidate.id !== id) : current));
+  }
+
+  async function handleRankCandidates() {
+    setRankingError("");
+    setRankingResult(null);
+
+    const readyCandidates = rankingCandidates.filter((candidate) => candidate.file);
+    if (!rankingJobDescription.trim()) {
+      setRankingError("Job description is required.");
+      return;
+    }
+    if (!readyCandidates.length) {
+      setRankingError("Upload at least one candidate CV.");
+      return;
+    }
+
+    setRankingLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("job_title", rankingJobTitle.trim() || "Untitled Role");
+      formData.append("job_description", rankingJobDescription.trim());
+      formData.append(
+        "candidates_json",
+        JSON.stringify(
+          readyCandidates.map((candidate, index) => ({
+            id: candidate.id || `candidate-${index + 1}`,
+            name: candidate.name.trim() || candidate.file.name.replace(/\.[^/.]+$/, ""),
+            demographics: candidate.demographics,
+          }))
+        )
+      );
+      readyCandidates.forEach((candidate) => {
+        formData.append("files", candidate.file);
+      });
+
+      const response = await fetch(rankingEndpoint, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Ranking API error ${response.status}`);
+      }
+
+      const data = await response.json();
+      setRankingResult(data);
+    } catch (error) {
+      setRankingError(error.message || "Failed to rank candidates.");
+    } finally {
+      setRankingLoading(false);
     }
   }
 
@@ -445,6 +566,224 @@ function JobPostsOnly({ jobs, search }) {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-200">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-base font-semibold tracking-tight text-slate-900">Candidate Ranking</div>
+              <div className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Before / after debiasing</div>
+            </div>
+          </div>
+          {rankingResult && (
+            <Pill className="w-fit border border-emerald-200 bg-emerald-50 text-emerald-700">
+              {rankingResult.fairness_summary?.improvement?.spread_reduction_pct}% spread reduction
+            </Pill>
+          )}
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="space-y-3">
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Job title</span>
+              <input
+                value={rankingJobTitle}
+                onChange={(event) => setRankingJobTitle(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-400"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Job description</span>
+              <textarea
+                value={rankingJobDescription}
+                onChange={(event) => setRankingJobDescription(event.target.value)}
+                rows={9}
+                className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-slate-400"
+              />
+            </label>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <UsersRound className="h-4 w-4 text-slate-500" />
+                Candidates
+              </div>
+              <button
+                type="button"
+                onClick={addRankingCandidate}
+                className="inline-flex items-center gap-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {rankingCandidates.map((candidate, index) => (
+                <div key={candidate.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+                      {index + 1}
+                    </div>
+                    <div className="grid flex-1 gap-3 md:grid-cols-2">
+                      <input
+                        value={candidate.name}
+                        onChange={(event) => updateRankingCandidate(candidate.id, "name", event.target.value)}
+                        placeholder="Candidate name"
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-slate-400"
+                      />
+                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
+                        <span className="truncate">{candidate.file ? candidate.file.name : "Upload CV"}</span>
+                        <Upload className="h-4 w-4 shrink-0 text-slate-500" />
+                        <input
+                          type="file"
+                          accept=".pdf,.docx,.txt"
+                          className="hidden"
+                          onChange={(event) => updateRankingCandidate(candidate.id, "file", event.target.files?.[0] || null)}
+                        />
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeRankingCandidate(candidate.id)}
+                      className="rounded-full p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                      aria-label="Remove candidate"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 md:grid-cols-5">
+                    {[
+                      ["university", UNIVERSITY_OPTIONS],
+                      ["university_tier", TIER_OPTIONS],
+                      ["gender", GENDER_OPTIONS],
+                      ["skin_color", SKIN_OPTIONS],
+                      ["ethnicity", ETHNICITY_OPTIONS],
+                    ].map(([field, options]) => (
+                      <select
+                        key={field}
+                        value={candidate.demographics[field]}
+                        onChange={(event) => updateRankingDemographics(candidate.id, field, event.target.value)}
+                        className="min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 outline-none focus:border-slate-400"
+                      >
+                        {options.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              {rankingError ? <div className="text-sm font-medium text-rose-600">{rankingError}</div> : <div />}
+              <Button
+                onClick={handleRankCandidates}
+                className="rounded-2xl bg-slate-900 px-4 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={rankingLoading}
+              >
+                {rankingLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Ranking
+                  </>
+                ) : (
+                  <>
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Rank Candidates
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {rankingResult && (
+          <div className="mt-5 space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs text-slate-500">Before spread</div>
+                <div className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                  {formatScore(rankingResult.fairness_summary?.before_debiasing?.score_spread)}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs text-slate-500">After spread</div>
+                <div className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                  {formatScore(rankingResult.fairness_summary?.after_debiasing?.score_spread)}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="text-xs text-emerald-700">Reduction</div>
+                <div className="mt-1 text-2xl font-bold tracking-tight text-emerald-800">
+                  {rankingResult.fairness_summary?.improvement?.spread_reduction_pct ?? 0}%
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-left text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Candidate</th>
+                    <th className="px-3 py-2 font-semibold">Before</th>
+                    <th className="px-3 py-2 font-semibold">After</th>
+                    <th className="px-3 py-2 font-semibold">Rank shift</th>
+                    <th className="px-3 py-2 font-semibold">Bias removed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankingResult.candidates?.map((candidate) => {
+                    const shift = candidate.bias_analysis?.rank_change || 0;
+                    return (
+                      <tr key={candidate.id} className="border-t border-slate-200 bg-white">
+                        <td className="px-3 py-3">
+                          <div className="font-semibold text-slate-900">{candidate.name}</div>
+                          <div className="mt-1 text-xs text-slate-500">{candidate.bias_analysis?.fairness_status}</div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="font-mono text-slate-900">{formatScore(candidate.step1_biased?.final_biased_score)}</div>
+                          <div className="text-xs text-slate-500">Rank #{candidate.step1_biased?.rank}</div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="font-mono text-slate-900">{formatScore(candidate.step2_fair?.fair_similarity)}</div>
+                          <div className="text-xs text-slate-500">Rank #{candidate.step2_fair?.rank}</div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <Pill
+                            className={cx(
+                              "border",
+                              shift > 0
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : shift < 0
+                                  ? "border-amber-200 bg-amber-50 text-amber-700"
+                                  : "border-slate-200 bg-slate-100 text-slate-700"
+                            )}
+                          >
+                            {shift > 0 ? `+${shift}` : shift}
+                          </Pill>
+                        </td>
+                        <td className="px-3 py-3 font-mono text-slate-700">
+                          {candidate.bias_analysis?.bias_removed_pct ?? 0}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
