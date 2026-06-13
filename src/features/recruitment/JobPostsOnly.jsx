@@ -25,44 +25,35 @@ const DEFAULT_RANKING_JD =
   "We are seeking a Data Analyst to analyze business data, build dashboards, and generate actionable insights. Requirements: 3+ years of Python, SQL, data visualization experience. Familiarity with pandas, scikit-learn, Tableau. Strong analytical and communication skills.";
 
 const SKILL_CATEGORY_META = {
-  "programming language": {
-    label: "Programming Languages",
-    className: "border-blue-200 bg-blue-50 text-blue-700",
-  },
-  framework: {
-    label: "Frameworks and Libraries",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  },
-  database: {
-    label: "Databases",
-    className: "border-amber-200 bg-amber-50 text-amber-700",
-  },
-  "devops tool": {
-    label: "Cloud and DevOps",
-    className: "border-violet-200 bg-violet-50 text-violet-700",
-  },
-  "machine learning concept": {
-    label: "ML and AI Concepts",
-    className: "border-rose-200 bg-rose-50 text-rose-700",
-  },
-  "soft skill": {
-    label: "Soft Skills",
-    className: "border-slate-200 bg-slate-100 text-slate-700",
-  },
-  methodology: {
-    label: "Methodologies",
-    className: "border-teal-200 bg-teal-50 text-teal-700",
-  },
+  "programming language":                  { label: "Languages",     className: "border-blue-200 bg-blue-50 text-blue-700" },
+  "framework or library":                  { label: "Frameworks",    className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  "database or data store":                { label: "Databases",     className: "border-amber-200 bg-amber-50 text-amber-700" },
+  "cloud or devops tool":                  { label: "Cloud/DevOps",  className: "border-violet-200 bg-violet-50 text-violet-700" },
+  "machine learning or AI concept":        { label: "ML & AI",       className: "border-rose-200 bg-rose-50 text-rose-700" },
+  "soft skill":                            { label: "Soft Skills",   className: "border-slate-200 bg-slate-100 text-slate-700" },
+  "methodology or process":                { label: "Methodology",   className: "border-teal-200 bg-teal-50 text-teal-700" },
+  "cybersecurity and network security tool": { label: "Security",    className: "border-red-200 bg-red-50 text-red-700" },
+  "software testing and QA automation tool": { label: "Testing/QA",  className: "border-orange-200 bg-orange-50 text-orange-700" },
+  "data visualization or BI tool":         { label: "Data Viz & BI", className: "border-indigo-200 bg-indigo-50 text-indigo-700" },
+  "big data or pipeline technology":       { label: "Big Data/ETL",  className: "border-cyan-200 bg-cyan-50 text-cyan-700" },
+  "design or prototyping tool":            { label: "Design Tools",  className: "border-pink-200 bg-pink-50 text-pink-700" },
+  "blockchain or web3 technology":         { label: "Blockchain",    className: "border-purple-200 bg-purple-50 text-purple-700" },
 };
 
 const SKILL_CATEGORY_ORDER = [
   "programming language",
-  "framework",
-  "database",
-  "devops tool",
-  "machine learning concept",
+  "framework or library",
+  "database or data store",
+  "cloud or devops tool",
+  "machine learning or AI concept",
   "soft skill",
-  "methodology",
+  "methodology or process",
+  "cybersecurity and network security tool",
+  "software testing and QA automation tool",
+  "data visualization or BI tool",
+  "big data or pipeline technology",
+  "design or prototyping tool",
+  "blockchain or web3 technology",
 ];
 
 function formatFileSize(bytes) {
@@ -96,6 +87,8 @@ function JobPostsOnly({ jobs, search }) {
   const [rankingResult, setRankingResult] = useState(null);
   const [rankingError, setRankingError] = useState("");
   const [rankingLoading, setRankingLoading] = useState(false);
+  const [rankingSkills, setRankingSkills] = useState(null);
+  const [skillsLoading, setSkillsLoading] = useState(false);
   const fileInputRef = useRef(null);
   const rankingJdInputRef = useRef(null);
   const rankingCvInputRef = useRef(null);
@@ -160,6 +153,46 @@ function JobPostsOnly({ jobs, search }) {
     }
   }, [selectedJobId]);
 
+  useEffect(() => {
+    if (!rankingResult?.candidates?.length) {
+      setRankingSkills(null);
+      return;
+    }
+    let cancelled = false;
+    setSkillsLoading(true);
+    (async () => {
+      try {
+        const texts = [rankingJobDescription, ...rankingResult.candidates.map((c) => c.resume || "")];
+        const results = await Promise.all(
+          texts.map(async (text) => {
+            if (!text?.trim()) return null;
+            try {
+              const r = await fetch(extractTextEndpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text }),
+              });
+              return r.ok ? r.json() : null;
+            } catch {
+              return null;
+            }
+          })
+        );
+        if (!cancelled) {
+          const [jdSkills, ...cvSkills] = results;
+          const candidateSkillMap = {};
+          rankingResult.candidates.forEach((c, i) => { candidateSkillMap[c.id] = cvSkills[i]; });
+          setRankingSkills({ jdSkills, candidateSkills: candidateSkillMap });
+        }
+      } catch {
+        // skill extraction is best-effort; don't break ranking results
+      } finally {
+        if (!cancelled) setSkillsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [rankingResult]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const selected = selectedJobId ? filteredJobs.find((job) => job.id === selectedJobId) || null : null;
   const applicants = selected ? mockApplicantsByJob[selected.id] || [] : [];
 
@@ -210,6 +243,7 @@ function JobPostsOnly({ jobs, search }) {
   };
 
   const module1Endpoint = `${MODULE1_API_URL.replace(/\/$/, "")}/extract-skills?mode=gliner`;
+  const extractTextEndpoint = `${MODULE1_API_URL.replace(/\/$/, "")}/extract-text`;
   const rankingEndpoint = `${MODULE1_RANKING_API_URL.replace(/\/$/, "")}/rank-candidates/upload`;
 
   async function handleExtractCvSkills() {
@@ -287,6 +321,8 @@ function JobPostsOnly({ jobs, search }) {
     setRankingResult(null);
     setRankingError("");
     setRankingLoading(false);
+    setRankingSkills(null);
+    setSkillsLoading(false);
     if (rankingJdInputRef.current) rankingJdInputRef.current.value = "";
     if (rankingCvInputRef.current) rankingCvInputRef.current.value = "";
   }
@@ -1018,6 +1054,154 @@ function JobPostsOnly({ jobs, search }) {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Skill Analysis */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-indigo-500" />
+                  <span className="text-sm font-semibold text-slate-900">Skill Analysis</span>
+                </div>
+                {skillsLoading && (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Extracting skills…
+                  </div>
+                )}
+              </div>
+
+              {skillsLoading && !rankingSkills && (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((n) => <div key={n} className="h-6 animate-pulse rounded-xl bg-slate-100" />)}
+                </div>
+              )}
+
+              {!skillsLoading && !rankingSkills && (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-400">
+                  Skill data unavailable — check the skill extractor API connection.
+                </div>
+              )}
+
+              {rankingSkills && (
+                <div className="space-y-6">
+                  {rankingSkills.jdSkills?.total > 0 && (
+                    <div>
+                      <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Required Skills — {rankingSkills.jdSkills.total} extracted from JD
+                      </div>
+                      <div className="space-y-2">
+                        {SKILL_CATEGORY_ORDER.filter((cat) => rankingSkills.jdSkills.categorized?.[cat]?.length).map((cat) => {
+                          const meta = SKILL_CATEGORY_META[cat];
+                          return (
+                            <div key={cat} className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
+                              <span className="w-24 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                {meta?.label || cat}
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {rankingSkills.jdSkills.categorized[cat].map((item) => (
+                                  <span
+                                    key={item.name}
+                                    className={cx(
+                                      "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                                      meta?.className || "border-slate-200 bg-slate-50 text-slate-700"
+                                    )}
+                                  >
+                                    {item.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Candidate Skill Profiles
+                    </div>
+                    <div className="space-y-3">
+                      {rankingResult.candidates
+                        ?.slice()
+                        .sort((a, b) => (a.step2_fair?.rank ?? 99) - (b.step2_fair?.rank ?? 99))
+                        .map((candidate) => {
+                          const skills = rankingSkills.candidateSkills?.[candidate.id];
+                          if (!skills) return null;
+                          const jdNames = (rankingSkills.jdSkills?.skills || []).map((s) => normalizeSkill(s.name));
+                          const matched = (skills.skills || []).filter((s) =>
+                            jdNames.some((jd) => isSkillMatch(s.name, jd))
+                          );
+                          const extra = (skills.skills || []).filter((s) =>
+                            !jdNames.some((jd) => isSkillMatch(s.name, jd))
+                          );
+                          const matchPct = jdNames.length > 0 ? Math.round((matched.length / jdNames.length) * 100) : 0;
+                          const isPriv = candidate.bias_analysis?.was_privileged;
+                          const isDis = candidate.bias_analysis?.was_disadvantaged;
+                          return (
+                            <div
+                              key={candidate.id}
+                              className={cx(
+                                "rounded-xl border p-3",
+                                isPriv ? "border-amber-200 bg-amber-50/30" : isDis ? "border-rose-200 bg-rose-50/30" : "border-slate-200 bg-slate-50"
+                              )}
+                            >
+                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-slate-900">{candidate.name}</span>
+                                  <span className="text-xs text-slate-400">Rank #{candidate.step2_fair?.rank}</span>
+                                </div>
+                                <span className={cx(
+                                  "rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                                  matchPct >= 70 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : matchPct >= 40 ? "border-amber-200 bg-amber-50 text-amber-700"
+                                  : "border-rose-200 bg-rose-50 text-rose-700"
+                                )}>
+                                  {matched.length}/{jdNames.length} required · {matchPct}%
+                                </span>
+                              </div>
+                              {matched.length > 0 && (
+                                <div className="mb-1.5 flex flex-wrap gap-1.5">
+                                  {matched.slice(0, 10).map((s) => {
+                                    const meta = SKILL_CATEGORY_META[s.category];
+                                    return (
+                                      <span
+                                        key={s.name}
+                                        className={cx(
+                                          "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                                          meta?.className || "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        )}
+                                      >
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        {s.name}
+                                      </span>
+                                    );
+                                  })}
+                                  {matched.length > 10 && (
+                                    <span className="text-xs text-slate-400">+{matched.length - 10} more matched</span>
+                                  )}
+                                </div>
+                              )}
+                              {extra.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {extra.slice(0, 8).map((s) => (
+                                    <span key={s.name} className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs text-slate-500">
+                                      {s.name}
+                                    </span>
+                                  ))}
+                                  {extra.length > 8 && (
+                                    <span className="text-xs text-slate-400">+{extra.length - 8} more</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
