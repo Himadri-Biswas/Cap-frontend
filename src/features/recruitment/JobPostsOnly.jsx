@@ -467,7 +467,8 @@ function JobPostsOnly({ jobs, search }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="hidden">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-200/70">
             <Sparkles className="h-5 w-5" />
@@ -617,6 +618,7 @@ function JobPostsOnly({ jobs, search }) {
             </div>
           </div>
         )}
+        </div>
       </div>
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
