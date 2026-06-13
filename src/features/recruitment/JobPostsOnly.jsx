@@ -627,13 +627,11 @@ function JobPostsOnly({ jobs, search }) {
             </div>
             <div>
               <div className="text-base font-semibold tracking-tight text-slate-900">Fair Candidate Screener</div>
-              <div className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Skill-matched · Bias-corrected</div>
             </div>
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="space-y-4">
+        <div className="mt-5 space-y-4">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Job title</span>
               <input
@@ -707,7 +705,6 @@ function JobPostsOnly({ jobs, search }) {
                 className="mt-3 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-slate-400"
               />
             </div>
-          </div>
 
           <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
             <input
