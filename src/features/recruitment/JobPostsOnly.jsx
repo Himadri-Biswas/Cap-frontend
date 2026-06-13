@@ -108,6 +108,7 @@ function JobPostsOnly({ jobs, search }) {
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingSkills, setRankingSkills] = useState(null);
   const [skillsLoading, setSkillsLoading] = useState(false);
+  const [jdExtracting, setJdExtracting] = useState(false);
   const fileInputRef = useRef(null);
   const rankingJdInputRef = useRef(null);
   const rankingCvInputRef = useRef(null);
@@ -331,11 +332,35 @@ function JobPostsOnly({ jobs, search }) {
     if (rankingCvInputRef.current) rankingCvInputRef.current.value = "";
   }
 
+  async function handleRankingJdFileChange(file) {
+    if (!file) return;
+    setRankingJdFile(file);
+    setRankingResult(null);
+    setRankingError("");
+    setJdExtracting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const r = await fetch(`${MODULE1_API_URL.replace(/\/$/, "")}/read-file`, {
+        method: "POST",
+        body: formData,
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data.text?.trim()) setRankingJobDescription(data.text.trim());
+      }
+    } catch {
+      // best-effort — user can still paste manually
+    } finally {
+      setJdExtracting(false);
+    }
+  }
+
   async function handleRankCandidates() {
     setRankingError("");
     setRankingResult(null);
 
-    if (!rankingJobDescription.trim() && !rankingJdFile) {
+    if (!rankingJobDescription.trim()) {
       setRankingError("Paste a job description or upload a JD file.");
       return;
     }
@@ -349,9 +374,6 @@ function JobPostsOnly({ jobs, search }) {
       const formData = new FormData();
       formData.append("job_title", rankingJobTitle.trim() || "Untitled Role");
       formData.append("job_description", rankingJobDescription.trim());
-      if (rankingJdFile) {
-        formData.append("jd_file", rankingJdFile);
-      }
       rankingCvFiles.forEach((file) => {
         formData.append("files", file);
       });
@@ -619,43 +641,54 @@ function JobPostsOnly({ jobs, search }) {
                 accept=".pdf,.docx,.txt"
                 className="hidden"
                 onChange={(event) => {
-                  setRankingJdFile(event.target.files?.[0] || null);
-                  setRankingResult(null);
-                  setRankingError("");
+                  const file = event.target.files?.[0] || null;
+                  if (file) handleRankingJdFileChange(file);
+                  event.target.value = "";
                 }}
               />
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-slate-900">Job Description</div>
-                  <div className="mt-1 text-xs text-slate-500">Upload JD or paste text below.</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => rankingJdInputRef.current?.click()}
-                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Upload JD
-                </button>
-              </div>
-
-              {rankingJdFile && (
-                <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-900">{rankingJdFile.name}</div>
-                    <div className="text-xs text-slate-500">{formatFileSize(rankingJdFile.size)}</div>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                    {jdExtracting ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> Extracting text…</>
+                    ) : rankingJdFile ? (
+                      <><FileText className="h-3 w-3 text-emerald-500" /><span>From <span className="font-medium text-slate-700">{rankingJdFile.name}</span> · edit below if needed</span></>
+                    ) : (
+                      "Upload JD or paste text below."
+                    )}
                   </div>
+                </div>
+                {rankingJdFile ? (
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => rankingJdInputRef.current?.click()}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRankingJdFile(null);
+                        setRankingJobDescription(DEFAULT_RANKING_JD);
+                      }}
+                      className="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => {
-                      setRankingJdFile(null);
-                      if (rankingJdInputRef.current) rankingJdInputRef.current.value = "";
-                    }}
-                    className="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                    onClick={() => rankingJdInputRef.current?.click()}
+                    className="shrink-0 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    Remove
+                    Upload JD
                   </button>
-                </div>
-              )}
+                )}
+              </div>
 
               <textarea
                 value={rankingJobDescription}
@@ -664,7 +697,7 @@ function JobPostsOnly({ jobs, search }) {
                   setRankingResult(null);
                 }}
                 rows={8}
-                placeholder="Paste job description here if no JD file is uploaded..."
+                placeholder="Paste job description here…"
                 className="mt-3 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-slate-400"
               />
             </div>
