@@ -73,6 +73,25 @@ function formatScore(value) {
   return typeof value === "number" ? value.toFixed(4) : "-";
 }
 
+function getSkillSections(skillPayload) {
+  const categorized = skillPayload?.categorized || {};
+  const knownSections = SKILL_CATEGORY_ORDER.filter((category) => categorized[category]?.length).map((category) => ({
+    category,
+    label: SKILL_CATEGORY_META[category]?.label || formatCategoryLabel(category),
+    className: SKILL_CATEGORY_META[category]?.className || "border-slate-200 bg-slate-50 text-slate-700",
+    items: categorized[category],
+  }));
+  const extraSections = Object.entries(categorized)
+    .filter(([category, items]) => !SKILL_CATEGORY_ORDER.includes(category) && items?.length)
+    .map(([category, items]) => ({
+      category,
+      label: formatCategoryLabel(category),
+      className: "border-slate-200 bg-slate-50 text-slate-700",
+      items,
+    }));
+  return [...knownSections, ...extraSections];
+}
+
 function JobPostsOnly({ jobs, search }) {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
@@ -217,22 +236,7 @@ function JobPostsOnly({ jobs, search }) {
   const selectedCandidate = rankedApplicants.find((candidate) => candidate.id === selectedCandidateId) || null;
 
   const extractedSkillSections = useMemo(() => {
-    const categorized = cvResult?.categorized || {};
-    const knownSections = SKILL_CATEGORY_ORDER.filter((category) => categorized[category]?.length).map((category) => ({
-      category,
-      label: SKILL_CATEGORY_META[category]?.label || formatCategoryLabel(category),
-      className: SKILL_CATEGORY_META[category]?.className || "border-slate-200 bg-slate-50 text-slate-700",
-      items: categorized[category],
-    }));
-    const extraSections = Object.entries(categorized)
-      .filter(([category, items]) => !SKILL_CATEGORY_ORDER.includes(category) && items?.length)
-      .map(([category, items]) => ({
-        category,
-        label: formatCategoryLabel(category),
-        className: "border-slate-200 bg-slate-50 text-slate-700",
-        items,
-      }));
-    return [...knownSections, ...extraSections];
+    return getSkillSections(cvResult);
   }, [cvResult]);
 
   const statusPill = (job) => {
@@ -1103,11 +1107,14 @@ function JobPostsOnly({ jobs, search }) {
                                   <span
                                     key={item.name}
                                     className={cx(
-                                      "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
                                       meta?.className || "border-slate-200 bg-slate-50 text-slate-700"
                                     )}
                                   >
-                                    {item.name}
+                                    <span>{item.name}</span>
+                                    {typeof item.score === "number" && (
+                                      <span className="font-mono opacity-70">{Math.round(item.score * 100)}%</span>
+                                    )}
                                   </span>
                                 ))}
                               </div>
@@ -1133,12 +1140,10 @@ function JobPostsOnly({ jobs, search }) {
                           const matched = (skills.skills || []).filter((s) =>
                             jdNames.some((jd) => isSkillMatch(s.name, jd))
                           );
-                          const extra = (skills.skills || []).filter((s) =>
-                            !jdNames.some((jd) => isSkillMatch(s.name, jd))
-                          );
                           const matchPct = jdNames.length > 0 ? Math.round((matched.length / jdNames.length) * 100) : 0;
                           const isPriv = candidate.bias_analysis?.was_privileged;
                           const isDis = candidate.bias_analysis?.was_disadvantaged;
+                          const candidateSkillSections = getSkillSections(skills);
                           return (
                             <div
                               key={candidate.id}
@@ -1161,38 +1166,43 @@ function JobPostsOnly({ jobs, search }) {
                                   {matched.length}/{jdNames.length} required · {matchPct}%
                                 </span>
                               </div>
-                              {matched.length > 0 && (
-                                <div className="mb-1.5 flex flex-wrap gap-1.5">
-                                  {matched.slice(0, 10).map((s) => {
-                                    const meta = SKILL_CATEGORY_META[s.category];
-                                    return (
-                                      <span
-                                        key={s.name}
-                                        className={cx(
-                                          "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                                          meta?.className || "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                        )}
-                                      >
-                                        <CheckCircle2 className="h-3 w-3" />
-                                        {s.name}
-                                      </span>
-                                    );
-                                  })}
-                                  {matched.length > 10 && (
-                                    <span className="text-xs text-slate-400">+{matched.length - 10} more matched</span>
-                                  )}
+                              {candidateSkillSections.length === 0 ? (
+                                <div className="rounded-xl border border-slate-100 bg-white/70 p-3 text-xs text-slate-400">
+                                  No categorized skills returned for this CV.
                                 </div>
-                              )}
-                              {extra.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {extra.slice(0, 8).map((s) => (
-                                    <span key={s.name} className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs text-slate-500">
-                                      {s.name}
-                                    </span>
+                              ) : (
+                                <div className="space-y-3">
+                                  {candidateSkillSections.map((section) => (
+                                    <div key={`${candidate.id}-${section.category}`}>
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                          {section.label}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400">{section.items.length} skills</div>
+                                      </div>
+                                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                        {section.items.map((item) => {
+                                          const isRequired = jdNames.some((jd) => isSkillMatch(item.name, jd));
+                                          return (
+                                            <span
+                                              key={`${candidate.id}-${section.category}-${item.name}`}
+                                              className={cx(
+                                                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                                                section.className,
+                                                isRequired && "ring-1 ring-current/20"
+                                              )}
+                                            >
+                                              {isRequired && <CheckCircle2 className="h-3 w-3" />}
+                                              <span>{item.name}</span>
+                                              {typeof item.score === "number" && (
+                                                <span className="font-mono opacity-70">{Math.round(item.score * 100)}%</span>
+                                              )}
+                                            </span>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
                                   ))}
-                                  {extra.length > 8 && (
-                                    <span className="text-xs text-slate-400">+{extra.length - 8} more</span>
-                                  )}
                                 </div>
                               )}
                             </div>
