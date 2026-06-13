@@ -599,11 +599,6 @@ function JobPostsOnly({ jobs, search }) {
               <div className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Before / after debiasing</div>
             </div>
           </div>
-          {rankingResult && (
-            <Pill className="w-fit border border-emerald-200 bg-emerald-50 text-emerald-700">
-              {rankingResult.fairness_summary?.improvement?.spread_reduction_pct}% spread reduction
-            </Pill>
-          )}
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
