@@ -734,95 +734,243 @@ function JobPostsOnly({ jobs, search }) {
         </div>
 
         {rankingResult && (
-          <div className="mt-5 space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="text-sm font-semibold text-slate-900">Parsed Candidate Profiles</div>
-              <div className="mt-3 grid gap-2 lg:grid-cols-2">
-                {rankingResult.candidates?.map((candidate) => (
-                  <div key={candidate.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="font-semibold text-slate-900">{candidate.name}</div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {[
-                        candidate.demographics?.university,
-                        candidate.demographics?.university_tier,
-                        candidate.demographics?.gender,
-                        candidate.demographics?.skin_color,
-                        candidate.demographics?.ethnicity,
-                      ].map((value, valueIndex) => (
-                        <Pill key={`${candidate.id}-${valueIndex}-${value || "unknown"}`} className="border border-slate-200 bg-white text-slate-700">
-                          {value || "Unknown"}
-                        </Pill>
-                      ))}
+          <div className="mt-6 space-y-4">
+            {/* Fairness Impact Banner */}
+            <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 text-white">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Fairness Impact</div>
+                  <div className="mt-1 text-5xl font-bold tabular-nums text-emerald-400">
+                    {rankingResult.fairness_summary?.improvement?.spread_reduction_pct ?? 0}%
+                  </div>
+                  <div className="mt-1.5 text-sm text-slate-300">
+                    Score spread:{" "}
+                    <span className="font-mono font-semibold text-white">
+                      {formatScore(rankingResult.fairness_summary?.before_debiasing?.score_spread)}
+                    </span>
+                    {" → "}
+                    <span className="font-mono font-semibold text-emerald-400">
+                      {formatScore(rankingResult.fairness_summary?.after_debiasing?.score_spread)}
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-white/10 px-4 py-3">
+                    <div className="text-xs font-medium text-slate-400">Most improved</div>
+                    <div className="mt-1 text-sm font-semibold text-white">
+                      {rankingResult.fairness_summary?.improvement?.most_improved}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs text-slate-500">Before spread</div>
-                <div className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-                  {formatScore(rankingResult.fairness_summary?.before_debiasing?.score_spread)}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs text-slate-500">After spread</div>
-                <div className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-                  {formatScore(rankingResult.fairness_summary?.after_debiasing?.score_spread)}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="text-xs text-emerald-700">Reduction</div>
-                <div className="mt-1 text-2xl font-bold tracking-tight text-emerald-800">
-                  {rankingResult.fairness_summary?.improvement?.spread_reduction_pct ?? 0}%
+                  <div className="rounded-2xl bg-white/10 px-4 py-3">
+                    <div className="text-xs font-medium text-slate-400">Shortlisted after</div>
+                    <div className="mt-1 text-xl font-bold text-emerald-400">
+                      {rankingResult.fairness_summary?.after_debiasing?.shortlisted_count}
+                      <span className="ml-1 text-sm font-normal text-slate-300">
+                        / {rankingResult.fairness_summary?.total_candidates}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* Score Comparison Bar Chart */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-sm font-semibold text-slate-900">Score Comparison — Biased vs Fair</div>
+                <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
+                    Biased
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    Fair
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-5">
+                {rankingResult.candidates?.map((candidate) => {
+                  const biasedScore = candidate.step1_biased?.final_biased_score ?? 0;
+                  const fairScore = candidate.step2_fair?.fair_similarity ?? 0;
+                  const isPriv = candidate.bias_analysis?.was_privileged;
+                  const isDis = candidate.bias_analysis?.was_disadvantaged;
+                  return (
+                    <div key={candidate.id}>
+                      <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                        <span className="font-semibold text-slate-900">{candidate.name}</span>
+                        <span className={cx(
+                          "rounded-full px-2 py-0.5 text-xs font-semibold",
+                          isPriv ? "bg-amber-50 text-amber-700" : isDis ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-500"
+                        )}>
+                          {isPriv ? "privileged" : isDis ? "disadvantaged" : "neutral"}
+                        </span>
+                        <span className="ml-auto text-xs text-slate-400">
+                          {candidate.demographics?.university} · {candidate.demographics?.gender} · {candidate.demographics?.ethnicity}
+                        </span>
+                      </div>
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="w-12 shrink-0 text-right text-xs text-slate-400">Biased</span>
+                        <div className="flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500" style={{ width: `${biasedScore * 100}%` }} />
+                        </div>
+                        <span className="w-16 shrink-0 text-right font-mono text-xs font-semibold text-amber-700">{biasedScore.toFixed(4)}</span>
+                        <span className="w-8 shrink-0 text-xs text-slate-400">#{candidate.step1_biased?.rank}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-12 shrink-0 text-right text-xs text-slate-400">Fair</span>
+                        <div className="flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-5 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500" style={{ width: `${fairScore * 100}%` }} />
+                        </div>
+                        <span className="w-16 shrink-0 text-right font-mono text-xs font-semibold text-emerald-700">{fairScore.toFixed(4)}</span>
+                        <span className="w-8 shrink-0 text-xs text-slate-400">#{candidate.step2_fair?.rank}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Rank Journey + Demographic Adjustments */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="mb-4 text-sm font-semibold text-slate-900">Rank Journey</div>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[1fr_40px_1fr] gap-2 pb-1">
+                    <div className="text-center text-xs font-semibold uppercase tracking-wider text-slate-400">Before</div>
+                    <div />
+                    <div className="text-center text-xs font-semibold uppercase tracking-wider text-slate-400">After</div>
+                  </div>
+                  {rankingResult.candidates?.map((candidate) => {
+                    const shift = candidate.bias_analysis?.rank_change || 0;
+                    const isPriv = candidate.bias_analysis?.was_privileged;
+                    const isDis = candidate.bias_analysis?.was_disadvantaged;
+                    const beforeCls = isPriv
+                      ? "border-amber-200 bg-amber-50 text-amber-800"
+                      : isDis
+                        ? "border-rose-200 bg-rose-50 text-rose-800"
+                        : "border-slate-200 bg-slate-50 text-slate-700";
+                    const afterCls = shift > 0
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : shift < 0
+                        ? "border-amber-200 bg-amber-50 text-amber-800"
+                        : "border-slate-200 bg-slate-50 text-slate-600";
+                    return (
+                      <div key={candidate.id} className="grid grid-cols-[1fr_40px_1fr] items-center gap-2">
+                        <div className={cx("rounded-xl border px-2 py-2 text-center text-xs font-semibold", beforeCls)}>
+                          #{candidate.step1_biased?.rank} {candidate.name.split(" ")[0]}
+                        </div>
+                        <div className={cx(
+                          "text-center text-sm font-bold",
+                          shift > 0 ? "text-emerald-600" : shift < 0 ? "text-amber-600" : "text-slate-400"
+                        )}>
+                          {shift > 0 ? `↑${shift}` : shift < 0 ? `↓${Math.abs(shift)}` : "→"}
+                        </div>
+                        <div className={cx("rounded-xl border px-2 py-2 text-center text-xs font-semibold", afterCls)}>
+                          #{candidate.step2_fair?.rank} {candidate.name.split(" ")[0]}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="mb-4 text-sm font-semibold text-slate-900">Demographic Adjustments (Biased Stage)</div>
+                <div className="space-y-3">
+                  {rankingResult.candidates?.map((candidate) => {
+                    const adj = candidate.step1_biased?.demographic_adjustments;
+                    const total = adj?.total ?? 0;
+                    return (
+                      <div key={candidate.id} className="rounded-xl bg-slate-50 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-800">{candidate.name}</span>
+                          <span className={cx(
+                            "font-mono text-xs font-bold",
+                            total > 0 ? "text-amber-600" : total < 0 ? "text-rose-600" : "text-slate-500"
+                          )}>
+                            {total > 0 ? "+" : ""}{total.toFixed(3)} total
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {[
+                            { label: "Uni", val: adj?.university },
+                            { label: "Gender", val: adj?.gender },
+                            { label: "Skin", val: adj?.skin_color },
+                            { label: "Ethnicity", val: adj?.ethnicity },
+                          ].map(({ label, val }) => (
+                            <div key={label} className={cx(
+                              "rounded-lg border px-1.5 py-1.5 text-center",
+                              val > 0 ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : val < 0 ? "border-rose-200 bg-rose-50 text-rose-700"
+                              : "border-slate-200 bg-white text-slate-400"
+                            )}>
+                              <div className="text-[10px]">{label}</div>
+                              <div className="font-mono text-xs font-semibold">{val > 0 ? "+" : ""}{(val ?? 0).toFixed(2)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Full Results Table */}
             <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Full Ranking Results</div>
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-slate-600">
+                <thead className="border-t border-slate-100 bg-slate-50 text-left">
                   <tr>
-                    <th className="px-3 py-2 font-semibold">Candidate</th>
-                    <th className="px-3 py-2 font-semibold">Before</th>
-                    <th className="px-3 py-2 font-semibold">After</th>
-                    <th className="px-3 py-2 font-semibold">Rank shift</th>
-                    <th className="px-3 py-2 font-semibold">Bias removed</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-slate-600">Candidate</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-slate-600">Before</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-slate-600">After</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-slate-600">Shift</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-slate-600">Verdict</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-slate-600">Bias removed</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rankingResult.candidates?.map((candidate) => {
                     const shift = candidate.bias_analysis?.rank_change || 0;
+                    const verdict = candidate.step2_fair?.verdict;
+                    const verdictCls =
+                      verdict === "SHORTLISTED" ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : verdict === "STRONG MATCH" ? "border-teal-200 bg-teal-50 text-teal-700"
+                      : verdict === "MATCH" ? "border-blue-200 bg-blue-50 text-blue-700"
+                      : verdict === "WEAK MATCH" ? "border-amber-200 bg-amber-50 text-amber-700"
+                      : "border-rose-200 bg-rose-50 text-rose-700";
                     return (
-                      <tr key={candidate.id} className="border-t border-slate-200 bg-white">
-                        <td className="px-3 py-3">
+                      <tr key={candidate.id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                        <td className="px-4 py-3">
                           <div className="font-semibold text-slate-900">{candidate.name}</div>
-                          <div className="mt-1 text-xs text-slate-500">{candidate.bias_analysis?.fairness_status}</div>
+                          <div className="mt-0.5 text-xs text-slate-400">
+                            {candidate.demographics?.university} · {candidate.demographics?.gender} · {candidate.demographics?.ethnicity}
+                          </div>
                         </td>
-                        <td className="px-3 py-3">
-                          <div className="font-mono text-slate-900">{formatScore(candidate.step1_biased?.final_biased_score)}</div>
-                          <div className="text-xs text-slate-500">Rank #{candidate.step1_biased?.rank}</div>
+                        <td className="px-4 py-3">
+                          <div className="font-mono font-semibold text-slate-900">{formatScore(candidate.step1_biased?.final_biased_score)}</div>
+                          <div className="text-xs text-slate-400">Rank #{candidate.step1_biased?.rank}</div>
                         </td>
-                        <td className="px-3 py-3">
-                          <div className="font-mono text-slate-900">{formatScore(candidate.step2_fair?.fair_similarity)}</div>
-                          <div className="text-xs text-slate-500">Rank #{candidate.step2_fair?.rank}</div>
+                        <td className="px-4 py-3">
+                          <div className="font-mono font-semibold text-emerald-700">{formatScore(candidate.step2_fair?.fair_similarity)}</div>
+                          <div className="text-xs text-slate-400">Rank #{candidate.step2_fair?.rank}</div>
                         </td>
-                        <td className="px-3 py-3">
-                          <Pill
-                            className={cx(
-                              "border",
-                              shift > 0
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : shift < 0
-                                  ? "border-amber-200 bg-amber-50 text-amber-700"
-                                  : "border-slate-200 bg-slate-100 text-slate-700"
-                            )}
-                          >
+                        <td className="px-4 py-3">
+                          <Pill className={cx(
+                            "border font-semibold",
+                            shift > 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : shift < 0 ? "border-amber-200 bg-amber-50 text-amber-700"
+                            : "border-slate-200 bg-slate-100 text-slate-500"
+                          )}>
                             {shift > 0 ? `+${shift}` : shift}
                           </Pill>
                         </td>
-                        <td className="px-3 py-3 font-mono text-slate-700">
+                        <td className="px-4 py-3">
+                          <span className={cx("rounded-full border px-2.5 py-1 text-xs font-semibold", verdictCls)}>{verdict}</span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-sm font-semibold text-slate-700">
                           {candidate.bias_analysis?.bias_removed_pct ?? 0}%
                         </td>
                       </tr>
@@ -830,6 +978,46 @@ function JobPostsOnly({ jobs, search }) {
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Parsed Profiles */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="mb-3 text-sm font-semibold text-slate-900">Parsed Candidate Profiles</div>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {rankingResult.candidates?.map((candidate) => {
+                  const isPriv = candidate.bias_analysis?.was_privileged;
+                  const isDis = candidate.bias_analysis?.was_disadvantaged;
+                  return (
+                    <div key={candidate.id} className={cx(
+                      "rounded-2xl border p-3",
+                      isPriv ? "border-amber-200 bg-amber-50/40" : isDis ? "border-rose-200 bg-rose-50/40" : "border-slate-200 bg-slate-50"
+                    )}>
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold text-slate-900">{candidate.name}</div>
+                        <span className={cx(
+                          "text-xs font-semibold",
+                          isPriv ? "text-amber-600" : isDis ? "text-rose-600" : "text-slate-400"
+                        )}>
+                          {isPriv ? "privileged" : isDis ? "disadvantaged" : "neutral"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {[
+                          candidate.demographics?.university,
+                          candidate.demographics?.university_tier,
+                          candidate.demographics?.gender,
+                          candidate.demographics?.skin_color,
+                          candidate.demographics?.ethnicity,
+                        ].map((value, i) => (
+                          <Pill key={i} className="border border-slate-200 bg-white text-xs text-slate-600">
+                            {value || "Unknown"}
+                          </Pill>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
