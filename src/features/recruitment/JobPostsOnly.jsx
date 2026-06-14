@@ -1056,16 +1056,26 @@ function JobPostsOnly({ jobs, search }) {
               <div className="space-y-3">
                 {rankingResult.candidates?.map((candidate) => {
                   const adj = candidate.step1_biased?.demographic_adjustments;
-                  const total = adj?.total ?? 0;
+                  const totalBefore = adj?.total ?? 0;
+                  const totalAfter = adj?.after?.total ?? 0;
                   const biasRemovedPct = candidate.bias_analysis?.bias_removed_pct ?? 0;
                   const isPriv = candidate.bias_analysis?.was_privileged;
                   const isDis = candidate.bias_analysis?.was_disadvantaged;
+                  const ATTRS = [
+                    { label: "University", key: "university" },
+                    { label: "Gender", key: "gender" },
+                    { label: "Skin Color", key: "skin_color" },
+                    { label: "Ethnicity", key: "ethnicity" },
+                  ];
+                  const fmtAdj = (v) => `${v > 0 ? "+" : ""}${(v ?? 0).toFixed(3)}`;
+                  const adjCls = (v) =>
+                    v > 0 ? "text-amber-600" : v < 0 ? "text-rose-600" : "text-slate-400";
                   return (
                     <div key={candidate.id} className={cx(
                       "rounded-xl border p-3",
                       isPriv ? "border-amber-200 bg-amber-50/30" : isDis ? "border-rose-200 bg-rose-50/30" : "border-slate-200 bg-slate-50"
                     )}>
-                      <div className="mb-2.5 flex items-center justify-between gap-2">
+                      <div className="mb-3 flex items-center justify-between gap-2">
                         <span className="text-sm font-semibold text-slate-900">{candidate.name}</span>
                         <span className={cx(
                           "rounded-full border px-2.5 py-0.5 text-xs font-semibold",
@@ -1076,31 +1086,55 @@ function JobPostsOnly({ jobs, search }) {
                           {biasRemovedPct}% bias removed
                         </span>
                       </div>
-                      <div className="grid grid-cols-4 gap-2">
-                        {[
-                          { label: "University", val: adj?.university },
-                          { label: "Gender", val: adj?.gender },
-                          { label: "Skin Color", val: adj?.skin_color },
-                          { label: "Ethnicity", val: adj?.ethnicity },
-                        ].map(({ label, val }) => (
-                          <div key={label} className={cx(
-                            "rounded-xl border px-2 py-2 text-center",
-                            val > 0 ? "border-amber-200 bg-amber-50 text-amber-700"
-                            : val < 0 ? "border-rose-200 bg-rose-50 text-rose-700"
-                            : "border-slate-200 bg-white text-slate-400"
-                          )}>
-                            <div className="text-[10px] font-medium">{label}</div>
-                            <div className="mt-0.5 font-mono text-xs font-bold">
-                              {val > 0 ? "+" : ""}{(val ?? 0).toFixed(2)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>Total adjustment applied by biased model</span>
-                        <span className={cx("font-mono font-semibold", total > 0 ? "text-amber-600" : total < 0 ? "text-rose-600" : "text-slate-400")}>
-                          {total > 0 ? "+" : ""}{total.toFixed(3)}
-                        </span>
+                      <div className="overflow-hidden rounded-xl border border-slate-200">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                              <th className="px-3 py-2">Bias Factor</th>
+                              <th className="px-3 py-2 text-right">Before</th>
+                              <th className="px-3 py-2 text-right">After</th>
+                              <th className="px-3 py-2 text-right">Removed</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ATTRS.map(({ label, key }) => {
+                              const before = adj?.[key] ?? 0;
+                              const after = adj?.after?.[key] ?? 0;
+                              const removedPct = adj?.after_removed_pct?.[key] ?? 0;
+                              return (
+                                <tr key={key} className="border-t border-slate-100">
+                                  <td className="px-3 py-2 font-medium text-slate-700">{label}</td>
+                                  <td className={cx("px-3 py-2 text-right font-mono font-semibold", adjCls(before))}>
+                                    {fmtAdj(before)}
+                                  </td>
+                                  <td className={cx("px-3 py-2 text-right font-mono font-semibold", adjCls(after))}>
+                                    {fmtAdj(after)}
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    {removedPct >= 90
+                                      ? <span className="font-semibold text-emerald-600">✓ {removedPct}%</span>
+                                      : <span className="text-slate-500">{removedPct}%</span>}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            <tr className="border-t-2 border-slate-200 bg-slate-50">
+                              <td className="px-3 py-2 font-semibold text-slate-900">Total bias penalty</td>
+                              <td className={cx("px-3 py-2 text-right font-mono font-semibold", adjCls(totalBefore))}>
+                                {fmtAdj(totalBefore)}
+                              </td>
+                              <td className={cx("px-3 py-2 text-right font-mono font-semibold", adjCls(totalAfter))}>
+                                {fmtAdj(totalAfter)}
+                              </td>
+                              <td className={cx(
+                                "px-3 py-2 text-right font-semibold",
+                                biasRemovedPct >= 60 ? "text-emerald-700" : "text-slate-500"
+                              )}>
+                                {biasRemovedPct}% reduction
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   );
