@@ -1075,16 +1075,8 @@ function JobPostsOnly({ jobs, search }) {
                       "rounded-xl border p-3",
                       isPriv ? "border-amber-200 bg-amber-50/30" : isDis ? "border-rose-200 bg-rose-50/30" : "border-slate-200 bg-slate-50"
                     )}>
-                      <div className="mb-3 flex items-center justify-between gap-2">
+                      <div className="mb-3">
                         <span className="text-sm font-semibold text-slate-900">{candidate.name}</span>
-                        <span className={cx(
-                          "rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                          biasRemovedPct >= 60 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : biasRemovedPct >= 30 ? "border-amber-200 bg-amber-50 text-amber-700"
-                          : "border-slate-200 bg-slate-100 text-slate-500"
-                        )}>
-                          {biasRemovedPct}% bias removed
-                        </span>
                       </div>
                       <div className="overflow-hidden rounded-xl border border-slate-200">
                         <table className="w-full text-xs">
