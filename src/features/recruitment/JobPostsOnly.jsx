@@ -902,7 +902,7 @@ function JobPostsOnly({ jobs, search }) {
                           <span className={cx("rounded-full border px-2.5 py-1 text-xs font-semibold", verdictCls)}>{verdict}</span>
                         </td>
                         <td className="px-4 py-3 font-mono text-sm font-semibold text-slate-700">
-                          {candidate.bias_analysis?.bias_removed_pct ?? 0}%
+                          {candidate.step1_biased?.demographic_adjustments?.after_removed_pct?.total ?? 0}%
                         </td>
                       </tr>
                     );
@@ -1110,21 +1110,26 @@ function JobPostsOnly({ jobs, search }) {
                                 </tr>
                               );
                             })}
-                            <tr className="border-t-2 border-slate-200 bg-slate-50">
-                              <td className="px-3 py-2 font-semibold text-slate-900">Total bias penalty</td>
-                              <td className={cx("px-3 py-2 text-right font-mono font-semibold", adjCls(totalBefore))}>
-                                {fmtAdj(totalBefore)}
-                              </td>
-                              <td className={cx("px-3 py-2 text-right font-mono font-semibold", adjCls(totalAfter))}>
-                                {fmtAdj(totalAfter)}
-                              </td>
-                              <td className={cx(
-                                "px-3 py-2 text-right font-semibold",
-                                biasRemovedPct >= 60 ? "text-emerald-700" : "text-slate-500"
-                              )}>
-                                {biasRemovedPct}% reduction
-                              </td>
-                            </tr>
+                            {(() => {
+                              const totalRemovedPct = adj?.after_removed_pct?.total ?? 0;
+                              return (
+                                <tr className="border-t-2 border-slate-200 bg-slate-50">
+                                  <td className="px-3 py-2 font-semibold text-slate-900">Total bias penalty</td>
+                                  <td className={cx("px-3 py-2 text-right font-mono font-semibold", adjCls(totalBefore))}>
+                                    {fmtAdj(totalBefore)}
+                                  </td>
+                                  <td className={cx("px-3 py-2 text-right font-mono font-semibold", adjCls(totalAfter))}>
+                                    {fmtAdj(totalAfter)}
+                                  </td>
+                                  <td className={cx(
+                                    "px-3 py-2 text-right font-semibold",
+                                    totalRemovedPct >= 60 ? "text-emerald-700" : "text-slate-500"
+                                  )}>
+                                    {totalRemovedPct}% reduction
+                                  </td>
+                                </tr>
+                              );
+                            })()}
                           </tbody>
                         </table>
                       </div>
