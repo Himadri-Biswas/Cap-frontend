@@ -161,7 +161,7 @@ It generates **3 intervention plans**:
 - **Plan 2** — An alternative single change (in case Plan 1 isn't feasible)
 - **Plan 3** — A combined two-change intervention for maximum risk reduction
 
-Only features that HR can realistically act on are considered — things like overtime, salary, job satisfaction, promotions, and training. Immutable attributes like age or gender are never suggested.
+Only features that HR can realistically act on are considered — things like overtime, salary, job satisfaction, promotions, and training. Immutable attributes like age or gender are never suggested..
 
 ---
 
