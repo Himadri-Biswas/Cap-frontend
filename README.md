@@ -174,3 +174,54 @@ Only features that HR can realistically act on are considered — things like ov
 | Interventions | Custom DiCE-style engine |
 | API | FastAPI (Python) |
 | Dataset | IBM HR Analytics (1,470 employees) |
+
+---
+
+# TalentPulse — Learning Path Recommendation (Module 2)
+
+Given an employee's current skills and a target job (an existing posting or
+a freeform description), Module 2 recommends a personalized, ordered
+learning path — under a time and budget constraint — to close the gap.
+
+---
+
+## How It Works
+
+### 🔎 Skill Extraction
+Resume/JD text is run through **GLiNER** (zero-shot NER), then normalized
+against a canonical skill vocabulary (72 skills, 197 aliases, fuzzy-matched
+with Jaro-Winkler similarity) so "TF", "tensorflow" and "TensorFlow" all
+resolve to the same skill.
+
+### 📊 Gap Analysis
+For each required skill: proficiency shortfall is computed, with **partial
+credit** if the employee has a semantically related skill (via Sentence-BERT
+cosine similarity) — e.g. knowing Vue.js reduces the effective gap for
+React. **Transferability** (graph + semantic neighbors already known) feeds
+into a learning-time estimate and a priority score
+(`criticality × gap / transferability`).
+
+### 🎯 Course Recommendation
+Courses are embedded with Sentence-BERT and semantically matched to each
+gap, then greedily selected under a **time budget + money budget +
+prerequisite** constraint, and topologically sorted into a valid learning
+order.
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Skill extraction | GLiNER (`gliner-community/gliner_large-v2.5`) |
+| Semantic similarity | Sentence-BERT (`all-mpnet-base-v2`) |
+| Course/skill graph | NetworkX |
+| API | FastAPI (Python), see `api/` |
+| Data | Synthetic employee/JD/course catalog (`notebooks/data/`) |
+
+## Frontend integration
+
+The "Upskilling" tab (`src/features/upskilling/UpskillingView.jsx`) calls
+the Module 2 API directly, following the same pattern as Module 1/3: set
+`VITE_MODULE2_API_URL` in `.env.local`, pick an employee + target job (or
+write a custom job description), then "Generate Learning Path". See
+`api/README.md` for running the backend locally and deploying it to
+HuggingFace Spaces.

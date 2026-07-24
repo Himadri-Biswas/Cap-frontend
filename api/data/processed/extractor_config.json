@@ -1,0 +1,17 @@
+{
+  "model_name": "gliner_large-v2.5",
+  "skill_labels": [
+    "programming language",
+    "software framework",
+    "technology tool",
+    "cloud platform",
+    "database",
+    "machine learning skill",
+    "data skill",
+    "devops skill",
+    "soft skill",
+    "certification",
+    "skill"
+  ],
+  "confidence_threshold": 0.4
+}
