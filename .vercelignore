@@ -1,0 +1,7 @@
+# Module 2 backend — deployed separately to a HuggingFace Space (see
+# api/README.md), never to Vercel. Without this, Vercel auto-detects
+# api/requirements.txt and tries to build it as a Python Serverless
+# Function, which fails: the ML deps (torch, transformers, gliner,
+# sentence-transformers, ...) bundle to several GB, far past Vercel's
+# 500MB function size limit.
+api/
