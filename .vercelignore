@@ -1,7 +1,17 @@
-# Module 2 backend — deployed separately to a HuggingFace Space (see
-# api/README.md), never to Vercel. Without this, Vercel auto-detects
-# api/requirements.txt and tries to build it as a Python Serverless
-# Function, which fails: the ML deps (torch, transformers, gliner,
-# sentence-transformers, ...) bundle to several GB, far past Vercel's
-# 500MB function size limit.
-api/
+# Module 2 REFERENCE backend source (the live app actually calls a teammate's
+# separately-hosted HuggingFace Space — see api/README.md — this folder is
+# unused source code, not a deployment). These specific files must never be
+# picked up by Vercel's Python function auto-detection: api/requirements.txt
+# would make Vercel try to build api/app.py as a Python Serverless Function,
+# and its ML deps (torch, transformers, gliner, sentence-transformers, ...)
+# bundle to several GB, far past Vercel's 500MB function size limit.
+#
+# We exclude these files individually — NOT the whole api/ folder — because
+# api/[...path].js in this same directory IS a real, intentional Vercel
+# serverless function: the TalentPulse data API (server/app.js).
+api/app.py
+api/requirements.txt
+api/Dockerfile
+api/README.md
+api/.gitignore
+api/data/
