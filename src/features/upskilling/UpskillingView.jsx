@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from "react";
-import { AlertCircle, Loader2, Sparkles } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Database, History, Loader2, Sparkles } from "lucide-react";
 import Button from "../../components/ui/Button.jsx";
 import { cx } from "../../lib/cx.js";
 import { skillTone } from "../../lib/skillTone.js";
+import { api } from "../../lib/api.js";
 
 // ── Module 2 API base URL (set VITE_MODULE2_API_URL in .env.local) ────────
 const MODULE2_API_URL = import.meta.env.VITE_MODULE2_API_URL || "https://rafatkabir-talent-matching-api.hf.space";
@@ -51,6 +52,8 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const [pastPaths, setPastPaths] = useState([]);
 
   const upskillingTargetJobs = useMemo(() => {
     const extraTargets = [
@@ -86,7 +89,24 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
   const resetResult = () => {
     setResult(null);
     setError(null);
+    setSaved(false);
   };
+
+  // Previously generated paths for this employee, straight from `learning_paths`.
+  useEffect(() => {
+    if (!selectedEmployee?.EmployeeNumber) {
+      setPastPaths([]);
+      return;
+    }
+    let cancelled = false;
+    api.upskilling
+      .paths({ EmployeeNumber: selectedEmployee.EmployeeNumber, limit: 5 })
+      .then((data) => !cancelled && setPastPaths(data.paths || []))
+      .catch(() => !cancelled && setPastPaths([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEmployee?.EmployeeNumber, saved]);
 
   const activeJobTitle = jobMode === "select" ? selectedTargetJob?.title : "Custom Job";
   const canGenerate = Boolean(
@@ -101,29 +121,53 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
     setLoading(true);
     setError(null);
     setResult(null);
+    setSaved(false);
+
+    // Identical body either way — this is the exact payload Module 2 expects.
+    const mlPayload = {
+      resume_text: resumeText,
+      jd_text: jdText,
+      level_hint: levelHint,
+      max_hours: maxTime,
+      max_budget: maxBudget,
+    };
 
     try {
-      const response = await fetch(`${MODULE2_API_URL.replace(/\/$/, "")}/analyze-text`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          resume_text: resumeText,
-          jd_text: jdText,
-          level_hint: levelHint,
-          max_hours: maxTime,
-          max_budget: maxBudget,
-        }),
+      // Preferred path: through our API, which forwards this body verbatim to
+      // the same `/analyze-text` endpoint and stores the response as it comes
+      // back. One ML round-trip, and the result is persisted.
+      const data = await api.upskilling.analyze({
+        ...mlPayload,
+        employeeId: selectedEmployee?.id ?? null,
+        EmployeeNumber: selectedEmployee?.EmployeeNumber ?? null,
+        employeeName: selectedEmployee?.name ?? null,
+        targetJobId: jobMode === "select" ? selectedTargetJob?.id ?? null : null,
+        targetJobTitle: activeJobTitle,
+        isCustomJob: jobMode !== "select",
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Module 2 API error ${response.status}`);
-      }
-
-      const data = await response.json();
       setResult(data);
-    } catch (err) {
-      setError(err.message || "Failed to reach the Module 2 learning path API. Is the backend running?");
+      setSaved(!!data._persisted);
+    } catch (proxyError) {
+      // Our server is down but the ML Space may be fine — go direct, exactly as
+      // before. The analysis still renders; it just is not saved.
+      try {
+        const response = await fetch(`${MODULE2_API_URL.replace(/\/$/, "")}/analyze-text`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(mlPayload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Module 2 API error ${response.status}`);
+        }
+
+        const data = await response.json();
+        setResult(data);
+        setSaved(false);
+      } catch (err) {
+        setError(err.message || proxyError.message || "Failed to reach the Module 2 learning path API. Is the backend running?");
+      }
     } finally {
       setLoading(false);
     }
@@ -308,10 +352,27 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
           <div className="mt-4">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-900">Recommended learning path</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-sm font-semibold text-slate-900">Recommended learning path</div>
+                  {saved && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                      <Database className="h-3 w-3" />
+                      Saved to MongoDB
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-slate-500 mt-1">
                   {selectedEmployee.name}: {selectedEmployee.JobRole} {"->"} {activeJobTitle}
                 </div>
+                {pastPaths.length > 0 && (
+                  <div className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <History className="h-3 w-3" />
+                    {pastPaths.length} earlier path{pastPaths.length > 1 ? "s" : ""} for this employee
+                    {pastPaths[0]?.jobReadiness != null
+                      ? ` · last readiness ${pastPaths[0].jobReadiness}%`
+                      : ""}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2">

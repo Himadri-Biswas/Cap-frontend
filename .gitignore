@@ -2,4 +2,9 @@ node_modules/
 dist/
 .vscode/
 *.log
+agenda.txt
+
+# Secrets — MONGO_URI and CLERK_SECRET_KEY live here. Never commit.
+.env
 .env.local
+.env.*.local

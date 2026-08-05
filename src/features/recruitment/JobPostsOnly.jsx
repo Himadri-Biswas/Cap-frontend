@@ -4,18 +4,26 @@ import {
   BarChart3,
   Calendar,
   CheckCircle2,
+  Eye,
   FileText,
   Loader2,
+  Mail,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
+  ThumbsDown,
+  ThumbsUp,
   Upload,
   UsersRound,
   XCircle,
 } from "lucide-react";
 import Button from "../../components/ui/Button.jsx";
 import Pill from "../../components/ui/Pill.jsx";
+import Modal from "../../components/ui/Modal.jsx";
+import CvViewer from "../../components/CvViewer.jsx";
+import ApplicantTags, { LastAppliedNote, TONE_BAR_CLASS, TONE_ROW_CLASS, tagTone } from "../../components/ApplicantTags.jsx";
 import { cx } from "../../lib/cx.js";
-import { mockApplicantsByJob } from "./mockApplicantsByJob.js";
+import { api } from "../../lib/api.js";
 
 const MODULE1_API_URL = import.meta.env.VITE_MODULE1_API_URL || "https://ijsasif-module-1-skill-extractor.hf.space";
 const MODULE1_RANKING_API_URL =
@@ -96,9 +104,18 @@ function getSkillSections(skillPayload) {
   return [...knownSections, ...extraSections];
 }
 
-function JobPostsOnly({ jobs, search }) {
+function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged }) {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
+
+  // ── Applications loaded from MongoDB for the selected job ────────────────
+  const [applicants, setApplicants] = useState([]);
+  const [applicantsLoading, setApplicantsLoading] = useState(false);
+  const [applicantsError, setApplicantsError] = useState("");
+  const [cvModal, setCvModal] = useState(null); // the candidate whose CV is open
+  const [statusBusy, setStatusBusy] = useState(null);
+  const [storedScreenLoading, setStoredScreenLoading] = useState(false);
+
   const [cvFile, setCvFile] = useState(null);
   const [cvResult, setCvResult] = useState(null);
   const [cvError, setCvError] = useState("");
@@ -116,6 +133,12 @@ function JobPostsOnly({ jobs, search }) {
   const fileInputRef = useRef(null);
   const rankingJdInputRef = useRef(null);
   const rankingCvInputRef = useRef(null);
+  /**
+   * Set when a ranking result already arrived with its skill sets attached
+   * (the stored-CV screening path), so the best-effort skill-extraction effect
+   * below does not immediately re-request what we already have.
+   */
+  const skillsPreloaded = useRef(false);
 
   const now = new Date(Date.UTC(2026, 1, 10, 12, 0, 0)); // demo "today"
 
@@ -132,13 +155,17 @@ function JobPostsOnly({ jobs, search }) {
     return candidate === required || candidate.includes(required) || required.includes(candidate);
   };
 
-  const getApplicantCount = (jobId) => (mockApplicantsByJob[jobId] || []).length;
+  // Counts now come from the denormalised counter MongoDB keeps on each job.
+  const getApplicantCount = (jobId) => {
+    if (selectedJobId === jobId && applicants.length) return applicants.length;
+    return jobs.find((j) => j.id === jobId)?.applicantCount ?? 0;
+  };
 
   const scoreCandidate = (candidate, job) => {
     const requiredSkills = job?.skills || [];
     if (!requiredSkills.length) return { score: 0.5, matchedSkills: [], matchPct: 0 };
 
-    const matchedSkills = candidate.skills.filter((skill) => requiredSkills.some((required) => isSkillMatch(skill, required)));
+    const matchedSkills = (candidate.skills || []).filter((skill) => requiredSkills.some((required) => isSkillMatch(skill, required)));
     const ratio = matchedSkills.length / requiredSkills.length;
     const score = Math.min(0.98, Math.max(0.45, 0.45 + ratio * 0.55));
     return {
@@ -177,9 +204,48 @@ function JobPostsOnly({ jobs, search }) {
     }
   }, [selectedJobId]);
 
+  // A notification deep-link ("open job J201") lands here.
+  const focusHandled = useRef(null);
+  useEffect(() => {
+    if (!focusJobId || focusHandled.current === focusJobId) return;
+    if (jobs.some((j) => j.id === focusJobId)) {
+      focusHandled.current = focusJobId;
+      setSelectedJobId(focusJobId);
+      setSelectedCandidateId(null);
+    }
+  }, [focusJobId, jobs]);
+
+  // ── Load this job's applications from MongoDB ───────────────────────────
+  const loadApplicants = React.useCallback(async (jobId) => {
+    if (!jobId) {
+      setApplicants([]);
+      return;
+    }
+    setApplicantsLoading(true);
+    setApplicantsError("");
+    try {
+      const data = await api.applications.listForJob(jobId);
+      setApplicants(data.applications || []);
+    } catch (err) {
+      setApplicantsError(err.message || "Could not load applicants.");
+      setApplicants([]);
+    } finally {
+      setApplicantsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadApplicants(selectedJobId);
+  }, [selectedJobId, loadApplicants]);
+
   useEffect(() => {
     if (!rankingResult?.candidates?.length) {
       setRankingSkills(null);
+      return;
+    }
+    // Skill sets already travelled with the result — don't re-extract them.
+    if (skillsPreloaded.current) {
+      skillsPreloaded.current = false;
       return;
     }
     let cancelled = false;
@@ -218,20 +284,22 @@ function JobPostsOnly({ jobs, search }) {
   }, [rankingResult]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = selectedJobId ? filteredJobs.find((job) => job.id === selectedJobId) || null : null;
-  const applicants = selected ? mockApplicantsByJob[selected.id] || [] : [];
 
   const rankedApplicants = useMemo(() => {
     if (!selected) return [];
     return applicants
       .map((applicant) => {
         const matched = scoreCandidate(applicant, selected);
-        const unmatched = applicant.skills.filter((skill) => !matched.matchedSkills.includes(skill));
+        const unmatched = (applicant.skills || []).filter((skill) => !matched.matchedSkills.includes(skill));
+        // A real module-1 fair-ranking score always beats the local heuristic.
+        const hasMlScore = applicant.scoreSource && applicant.scoreSource !== "heuristic";
         return {
           ...applicant,
-          score: matched.score,
-          matchPct: matched.matchPct,
-          matchedSkills: matched.matchedSkills,
+          score: hasMlScore ? applicant.score : matched.score,
+          matchPct: applicant.matchPct ?? matched.matchPct,
+          matchedSkills: applicant.matchedSkills?.length ? applicant.matchedSkills : matched.matchedSkills,
           displaySkills: [...matched.matchedSkills, ...unmatched],
+          tone: tagTone(applicant.tags || []),
         };
       })
       .sort((a, b) => b.score - a.score)
@@ -405,6 +473,74 @@ function JobPostsOnly({ jobs, search }) {
       setRankingLoading(false);
     }
   }
+
+  /**
+   * Screen the CVs applicants ALREADY submitted for this job.
+   *
+   * The server pulls each stored CV out of GridFS and posts the exact same
+   * multipart request to the module-1 ranking Space, so the response lands in
+   * `rankingResult` in exactly the shape the panels below already render —
+   * only the source of the files changed. It also writes each candidate's fair
+   * score back onto their application.
+   */
+  async function handleScreenStoredCvs() {
+    if (!selected) return;
+    setStoredScreenLoading(true);
+    setRankingError("");
+    setRankingResult(null);
+    try {
+      const data = await api.screening.runFromJob({ jobId: selected.id });
+      if (data._jdSkills || data._candidateSkills) {
+        skillsPreloaded.current = true;
+        setRankingSkills({ jdSkills: data._jdSkills, candidateSkills: data._candidateSkills || {} });
+      }
+      setRankingJobTitle(selected.title);
+      setRankingJobDescription(selected.description || selected.summary || "");
+      setRankingResult(data);
+      await loadApplicants(selected.id);
+    } catch (error) {
+      setRankingError(error.message || "Could not screen the stored CVs for this job.");
+    } finally {
+      setStoredScreenLoading(false);
+    }
+  }
+
+  async function handleSetStatus(applicationId, status) {
+    setStatusBusy(applicationId);
+    try {
+      await api.applications.setStatus(applicationId, status);
+      await loadApplicants(selectedJobId);
+      onJobsChanged?.();
+    } catch (error) {
+      setApplicantsError(error.message || "Could not update this application.");
+    } finally {
+      setStatusBusy(null);
+    }
+  }
+
+  /** Runs module-1 GLiNER extraction on a CV that was stored without it. */
+  async function handleReextract(applicationId) {
+    setStatusBusy(applicationId);
+    try {
+      await api.applications.reextract(applicationId);
+      await loadApplicants(selectedJobId);
+    } catch (error) {
+      setApplicantsError(error.message || "Skill extraction failed.");
+    } finally {
+      setStatusBusy(null);
+    }
+  }
+
+  const STATUS_STYLE = {
+    submitted: "border-slate-200 bg-slate-100 text-slate-600",
+    under_review: "border-sky-200 bg-sky-50 text-sky-700",
+    shortlisted: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    interview: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    offered: "border-violet-200 bg-violet-50 text-violet-700",
+    hired: "border-emerald-300 bg-emerald-100 text-emerald-800",
+    rejected: "border-rose-200 bg-rose-50 text-rose-700",
+    withdrawn: "border-slate-200 bg-slate-100 text-slate-500",
+  };
 
   const JobList = ({ compact }) => (
     <div className={cx("rounded-3xl border border-slate-200 bg-white p-4 shadow-sm", compact && "h-fit")}>
@@ -1379,12 +1515,56 @@ function JobPostsOnly({ jobs, search }) {
           <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-slate-900">Applicants</div>
-              <Pill className="border border-slate-200 bg-slate-100 text-slate-700">
-                {rankedApplicants.length} applicants
-              </Pill>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => loadApplicants(selectedJobId)}
+                  disabled={applicantsLoading}
+                  className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                  title="Reload applicants"
+                >
+                  <RefreshCw className={cx("h-3.5 w-3.5", applicantsLoading && "animate-spin")} />
+                </button>
+                <Pill className="border border-slate-200 bg-slate-100 text-slate-700">
+                  {rankedApplicants.length} applicants
+                </Pill>
+              </div>
             </div>
 
-            {rankedApplicants.length === 0 ? (
+            {rankedApplicants.length > 0 && (
+              <button
+                type="button"
+                onClick={handleScreenStoredCvs}
+                disabled={storedScreenLoading}
+                title="Send every stored CV for this job to the fair-ranking model"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {storedScreenLoading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Screening {rankedApplicants.length} stored CVs…
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Fair-screen these {rankedApplicants.length} applicants
+                  </>
+                )}
+              </button>
+            )}
+
+            {applicantsError && (
+              <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+                {applicantsError}
+              </div>
+            )}
+
+            {applicantsLoading && rankedApplicants.length === 0 ? (
+              <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading applicants…
+              </div>
+            ) : rankedApplicants.length === 0 ? (
               <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 No applicants yet for this job.
               </div>
@@ -1406,33 +1586,57 @@ function JobPostsOnly({ jobs, search }) {
                           <tr
                             key={candidate.id}
                             className={cx(
-                              "cursor-pointer border-t border-slate-200",
-                              isActive ? "bg-indigo-50" : "hover:bg-slate-50"
+                              "relative cursor-pointer border-t border-slate-200 transition",
+                              isActive ? "bg-indigo-50" : TONE_ROW_CLASS[candidate.tone] || "hover:bg-slate-50"
                             )}
                             onClick={() => setSelectedCandidateId(candidate.id)}
                           >
-                            <td className="px-3 py-2 font-mono text-slate-700">{candidate.rank}</td>
+                            <td className="relative px-3 py-2 font-mono text-slate-700">
+                              {/* Tone stripe: green = returning, red = rejected before */}
+                              <span
+                                className={cx(
+                                  "absolute left-0 top-0 h-full w-1",
+                                  TONE_BAR_CLASS[candidate.tone] || "bg-transparent"
+                                )}
+                              />
+                              {candidate.rank}
+                            </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 font-bold text-white">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 font-bold text-white">
                                   {candidate.name
                                     .split(" ")
                                     .slice(0, 2)
                                     .map((part) => part[0])
                                     .join("")}
                                 </div>
-                                <div className="font-semibold text-slate-900">{candidate.name}</div>
+                                <div className="min-w-0">
+                                  <div className="truncate font-semibold text-slate-900">{candidate.name}</div>
+                                  {candidate.tags?.length ? (
+                                    <ApplicantTags tags={candidate.tags} size="xs" className="mt-1" />
+                                  ) : null}
+                                </div>
                               </div>
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
                                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                                   <div
-                                    className="h-full rounded-full bg-indigo-600"
+                                    className={cx(
+                                      "h-full rounded-full transition-all duration-500",
+                                      candidate.scoreSource && candidate.scoreSource !== "heuristic"
+                                        ? "bg-emerald-600"
+                                        : "bg-indigo-600"
+                                    )}
                                     style={{ width: `${Math.round(candidate.score * 100)}%` }}
                                   />
                                 </div>
                                 <span className="font-mono text-slate-700">{(candidate.score * 100).toFixed(0)}%</span>
+                              </div>
+                              <div className="mt-0.5 text-[10px] text-slate-400">
+                                {candidate.scoreSource && candidate.scoreSource !== "heuristic"
+                                  ? "fair-ranked"
+                                  : "skill match"}
                               </div>
                             </td>
                           </tr>
@@ -1442,20 +1646,124 @@ function JobPostsOnly({ jobs, search }) {
                   </table>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div
+                  className={cx(
+                    "rounded-2xl border p-4",
+                    selectedCandidate?.tone === "positive"
+                      ? "border-emerald-200 bg-emerald-50/50"
+                      : selectedCandidate?.tone === "negative"
+                        ? "border-rose-200 bg-rose-50/50"
+                        : selectedCandidate?.tone === "mixed"
+                          ? "border-amber-200 bg-amber-50/50"
+                          : "border-slate-200 bg-slate-50"
+                  )}
+                >
                   {!selectedCandidate ? null : (
                     <div>
                       <div className="flex items-start justify-between gap-3">
-                        <div>
+                        <div className="min-w-0">
                           <div className="text-base font-bold text-slate-900">{selectedCandidate.name}</div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                            <Mail className="h-3 w-3" />
+                            <span className="truncate">{selectedCandidate.email}</span>
+                          </div>
                         </div>
-                        <Pill className="border border-indigo-200 bg-indigo-50 text-indigo-700">
+                        <Pill className="shrink-0 border border-indigo-200 bg-indigo-50 text-indigo-700">
                           Score: {(selectedCandidate.score * 100).toFixed(0)}%
                         </Pill>
                       </div>
 
+                      {/* POSITIVE / NEGATIVE re-application tags */}
+                      {selectedCandidate.tags?.length ? (
+                        <ApplicantTags tags={selectedCandidate.tags} className="mt-3" />
+                      ) : null}
+
+                      {selectedCandidate.isFormerEmployee && (
+                        <div className="mt-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-800">
+                          <span className="font-semibold">Worked here before</span>
+                          {selectedCandidate.formerRole ? ` as ${selectedCandidate.formerRole}` : ""}
+                          {selectedCandidate.formerDepartment ? ` in ${selectedCandidate.formerDepartment}` : ""}
+                          {selectedCandidate.formerTenureYears != null
+                            ? ` · ${selectedCandidate.formerTenureYears} years tenure`
+                            : ""}
+                          {selectedCandidate.formerExitDate
+                            ? ` · left ${new Date(selectedCandidate.formerExitDate).toLocaleDateString(undefined, { dateStyle: "medium" })}`
+                            : ""}
+                        </div>
+                      )}
+
+                      {selectedCandidate.wasPreviouslyRejected && (
+                        <div className="mt-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs text-rose-800">
+                          <span className="font-semibold">
+                            Rejected {selectedCandidate.previousRejectionCount}×
+                          </span>{" "}
+                          before and has applied again.
+                        </div>
+                      )}
+
+                      {/* "Admin can click his entry and see his last applied date" */}
+                      <LastAppliedNote application={selectedCandidate} />
+
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-400">Applied</div>
+                          <div className="mt-0.5 text-xs font-semibold text-slate-800">
+                            {new Date(selectedCandidate.appliedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-400">Status</div>
+                          <div className="mt-0.5">
+                            <span
+                              className={cx(
+                                "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold capitalize",
+                                STATUS_STYLE[selectedCandidate.status] || STATUS_STYLE.submitted
+                              )}
+                            >
+                              {selectedCandidate.status.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {selectedCandidate.currentTitle || selectedCandidate.yearsExperience != null ? (
+                        <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                          {selectedCandidate.currentTitle}
+                          {selectedCandidate.yearsExperience != null
+                            ? ` · ${selectedCandidate.yearsExperience} yrs experience`
+                            : ""}
+                          {selectedCandidate.location ? ` · ${selectedCandidate.location}` : ""}
+                        </div>
+                      ) : null}
+
+                      {selectedCandidate.coverLetter ? (
+                        <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-400">Cover letter</div>
+                          <div className="mt-1 text-xs leading-5 text-slate-600">{selectedCandidate.coverLetter}</div>
+                        </div>
+                      ) : null}
+
                       <div className="mt-3">
-                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-700">Skills</div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs font-semibold uppercase tracking-wider text-slate-700">Skills</div>
+                          {selectedCandidate.extractionStatus === "done" ? (
+                            <span className="text-[10px] font-semibold text-emerald-600">GLiNER extracted</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleReextract(selectedCandidate.applicationId)}
+                              disabled={statusBusy === selectedCandidate.applicationId}
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+                            >
+                              {statusBusy === selectedCandidate.applicationId ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-3 w-3" />
+                              )}
+                              Extract skills
+                            </button>
+                          )}
+                        </div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {selectedCandidate.displaySkills.map((skill) => {
                             const isMatched = selectedCandidate.matchedSkills.includes(skill);
@@ -1476,13 +1784,37 @@ function JobPostsOnly({ jobs, search }) {
                         </div>
                       </div>
 
-                      <div className="mt-4">
+                      <div className="mt-4 space-y-2">
                         <button
                           type="button"
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                          onClick={() => setCvModal(selectedCandidate)}
+                          disabled={!selectedCandidate.cvFileId}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          View CV
+                          <Eye className="h-4 w-4" />
+                          {selectedCandidate.cvFileId ? "View CV" : "No CV attached"}
                         </button>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSetStatus(selectedCandidate.applicationId, "shortlisted")}
+                            disabled={statusBusy === selectedCandidate.applicationId || selectedCandidate.status === "shortlisted"}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                          >
+                            <ThumbsUp className="h-3.5 w-3.5" />
+                            Shortlist
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetStatus(selectedCandidate.applicationId, "rejected")}
+                            disabled={statusBusy === selectedCandidate.applicationId || selectedCandidate.status === "rejected"}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                          >
+                            <ThumbsDown className="h-3.5 w-3.5" />
+                            Reject
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1492,6 +1824,31 @@ function JobPostsOnly({ jobs, search }) {
           </div>
         </div>
       )}
+
+      {/* CV viewer — streams the file from GridFS with the caller's auth header */}
+      <Modal
+        open={!!cvModal}
+        onClose={() => setCvModal(null)}
+        size="lg"
+        title={cvModal ? `${cvModal.name} — CV` : "CV"}
+        subtitle={
+          cvModal
+            ? `${cvModal.jobTitle || ""} · applied ${new Date(cvModal.appliedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}`
+            : ""
+        }
+      >
+        {cvModal && (
+          <div className="space-y-4">
+            {cvModal.tags?.length ? <ApplicantTags tags={cvModal.tags} /> : null}
+            <CvViewer
+              fileId={cvModal.cvFileId}
+              filename={cvModal.cvOriginalName}
+              mimeType={cvModal.cvMimeType}
+              height="65vh"
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

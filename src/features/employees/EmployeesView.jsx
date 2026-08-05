@@ -1,11 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
   Calendar,
+  CheckCircle2,
   ChevronDown,
+  Database,
   Filter,
+  History,
   Loader2,
+  RotateCcw,
+  Sparkles,
   TrendingDown,
   TrendingUp,
   Users,
@@ -15,6 +20,7 @@ import Button from "../../components/ui/Button.jsx";
 import Pill from "../../components/ui/Pill.jsx";
 import SoftTag from "../../components/ui/SoftTag.jsx";
 import { cx } from "../../lib/cx.js";
+import { api } from "../../lib/api.js";
 
 // ── API base URL (set VITE_API_URL in .env.local) ─────────────────────────────
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -58,10 +64,85 @@ function tierToRiskLabel(tier) {
   return "Low";
 }
 
+function relativeTime(date) {
+  if (!date) return "";
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+/**
+ * A DiCE counterfactual only tells us the target VALUE. To apply it live we
+ * need the raw column name too — module 3 already returns `feature_changed`,
+ * so this just coerces the suggested value into the type the model expects.
+ */
+function coerceSuggested(change) {
+  const raw = change.suggested_value;
+  if (typeof raw === "number") return raw;
+  const asNumber = Number(raw);
+  return Number.isFinite(asNumber) && String(raw).trim() !== "" ? asNumber : raw;
+}
+
+// ── Dropdown used by the filter bar ──────────────────────────────────────────
+function Dropdown({ icon: Icon, value, options, onChange, minWidth = 160 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => ref.current && !ref.current.contains(e.target) && setOpen(false);
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{ minWidth }}
+        className={cx(
+          "inline-flex w-full items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-sm transition",
+          open ? "border-indigo-300 bg-indigo-50" : "border-slate-200 bg-white hover:bg-slate-50"
+        )}
+      >
+        <span className="flex items-center gap-2 truncate">
+          <Icon className="h-4 w-4 shrink-0 text-slate-500" />
+          <span className="truncate">{value}</span>
+        </span>
+        <ChevronDown className={cx("h-4 w-4 shrink-0 text-slate-500 transition", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-1 max-h-72 w-full min-w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white py-1 shadow-xl">
+          {options.map((option) => (
+            <button
+              key={option}
+              onClick={() => {
+                onChange(option);
+                setOpen(false);
+              }}
+              className={cx(
+                "flex w-full items-center justify-between px-3 py-2 text-left text-sm transition",
+                option === value ? "bg-indigo-50 font-semibold text-indigo-700" : "text-slate-700 hover:bg-slate-50"
+              )}
+            >
+              <span className="truncate">{option}</span>
+              {option === value && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
-function EmployeesView({ employees, search, setSearch }) {
+function EmployeesView({ employees, search, setSearch, focusId = null, onEmployeesChanged }) {
   const [dept, setDept]             = useState("All Department");
   const [riskFilter, setRiskFilter] = useState("All Risk");
   const [mode, setMode]             = useState("All Mode");
@@ -72,6 +153,24 @@ function EmployeesView({ employees, search, setSearch }) {
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState(null);
 
+  // Live-intervention state (module 3 "LIVE attrition")
+  const [applying, setApplying]     = useState(null);  // feature currently being applied
+  const [applyError, setApplyError] = useState(null);
+  const [lastApplied, setLastApplied] = useState(null);
+  const [history, setHistory]       = useState([]);
+  const [reverting, setReverting]   = useState(false);
+
+  // Filter option lists, derived from whatever MongoDB actually returned
+  const departments = useMemo(
+    () => ["All Department", ...[...new Set(employees.map((e) => e.Department).filter(Boolean))].sort()],
+    [employees]
+  );
+  const workModes = useMemo(
+    () => ["All Mode", ...[...new Set(employees.map((e) => e.workMode).filter(Boolean))].sort()],
+    [employees]
+  );
+  const riskTiers = ["All Risk", "Critical", "High", "Medium", "Low"];
+
   // Filter employees
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -79,10 +178,11 @@ function EmployeesView({ employees, search, setSearch }) {
       const qOk = !q || `${e.name} ${e.JobRole} ${e.email}`.toLowerCase().includes(q);
       const dOk = dept      === "All Department" || e.Department  === dept;
       const mOk = mode      === "All Mode"       || e.workMode    === mode;
-      // riskFilter compares against verdicts from analysis if available; skip for now at list level
-      return qOk && dOk && mOk;
+      // risk_tier is the cached prediction MongoDB attached to each row
+      const rOk = riskFilter === "All Risk"      || e.risk_tier   === riskFilter;
+      return qOk && dOk && mOk && rOk;
     });
-  }, [employees, search, dept, mode]);
+  }, [employees, search, dept, mode, riskFilter]);
 
   // Deselect if filtered out
   useEffect(() => {
@@ -94,12 +194,55 @@ function EmployeesView({ employees, search, setSearch }) {
 
   const selectedEmployee = filtered.find((x) => x.id === selectedId) || null;
 
+  // A notification deep-link ("open employee #123") lands here.
+  const focusHandled = useRef(null);
+  useEffect(() => {
+    if (!focusId || focusHandled.current === focusId || !employees.length) return;
+    const match = employees.find(
+      (e) => e.id === focusId || String(e.EmployeeNumber) === String(focusId)
+    );
+    if (match) {
+      focusHandled.current = focusId;
+      setDept("All Department");
+      setMode("All Mode");
+      setRiskFilter("All Risk");
+      handleSelectEmployee(match);
+    }
+  }, [focusId, employees]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Fetch inference when employee is selected ──────────────────────────────
-  async function handleSelectEmployee(e) {
+  /**
+   * `live=false` (the default) reads the prediction MongoDB already cached, so
+   * opening an employee is instant. `live=true` runs the untouched module-3
+   * `/infer` call below — same URL, same payload as before — and writes the
+   * fresh result back into the cache.
+   */
+  async function handleSelectEmployee(e, { live = false } = {}) {
     setSelectedId(e.id);
     setAnalysis(null);
     setError(null);
+    setApplyError(null);
+    setLastApplied(null);
     setLoading(true);
+
+    api.employees
+      .events(e.EmployeeNumber)
+      .then((data) => setHistory(data.events || []))
+      .catch(() => setHistory([]));
+
+    // ── Cached path ────────────────────────────────────────────────────────
+    if (!live) {
+      try {
+        const cached = await api.attrition.get(e.EmployeeNumber);
+        if (cached) {
+          setAnalysis(cached);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // No cached analysis yet — fall through to live inference.
+      }
+    }
 
     // Build the raw feature payload (all IBM HR columns)
     const payload = {
@@ -151,10 +294,66 @@ function EmployeesView({ employees, search, setSearch }) {
       }
       const data = await res.json();
       setAnalysis(data);
+      // Cache it so the next open (and the top-5 alert) has real numbers.
+      api.employees.saveAnalysis(e.EmployeeNumber, data).catch(() => {});
     } catch (err) {
       setError(err.message || "Failed to reach inference API. Is the backend running?");
     } finally {
       setLoading(false);
+    }
+  }
+
+  /**
+   * LIVE ATTRITION — the admin acts on a counterfactual.
+   *
+   * The server writes the new value onto the employee, re-runs the real
+   * module-3 model, stores the new probability in MongoDB Atlas and returns a
+   * standard `/infer`-shaped payload, which drops straight back into
+   * `analysis` — so every panel below re-renders from freshly stored numbers.
+   */
+  async function handleApplyIntervention(change, plan) {
+    if (!selectedEmployee) return;
+    const feature = change.feature_changed;
+    setApplying(feature);
+    setApplyError(null);
+    try {
+      const result = await api.attrition.apply(selectedEmployee.EmployeeNumber, {
+        feature,
+        value: coerceSuggested(change),
+        cfIndex: plan?.cf_index ?? null,
+        interventionLabel: change.intervention_label,
+      });
+      setAnalysis(result);
+      setLastApplied(result._applied || null);
+      api.employees
+        .events(selectedEmployee.EmployeeNumber)
+        .then((data) => setHistory(data.events || []))
+        .catch(() => {});
+      onEmployeesChanged?.();
+    } catch (err) {
+      setApplyError(err.message || "Could not apply this intervention.");
+    } finally {
+      setApplying(null);
+    }
+  }
+
+  async function handleRevert() {
+    if (!selectedEmployee) return;
+    setReverting(true);
+    setApplyError(null);
+    try {
+      const result = await api.attrition.revert(selectedEmployee.EmployeeNumber);
+      setAnalysis(result);
+      setLastApplied(result._applied || null);
+      api.employees
+        .events(selectedEmployee.EmployeeNumber)
+        .then((data) => setHistory(data.events || []))
+        .catch(() => {});
+      onEmployeesChanged?.();
+    } catch (err) {
+      setApplyError(err.message || "Could not revert.");
+    } finally {
+      setReverting(false);
     }
   }
 
@@ -167,19 +366,43 @@ function EmployeesView({ employees, search, setSearch }) {
   );
 
   const EmployeeCard = ({ e }) => {
-    // Risk badge color is neutral until analysis arrives
+    const tier = e.risk_tier;
+    const colors = tier ? getRiskColors(tier) : null;
     return (
       <button
         onClick={() => handleSelectEmployee(e)}
-        className="text-left rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:bg-slate-50"
+        className="text-left rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
       >
         <div className="flex items-start gap-3">
           <div className="h-14 w-14 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold">
             {e.initials}
           </div>
-          <div className="flex-1">
-            <div className="text-lg font-bold text-slate-900">{e.name}</div>
-            <div className="text-sm text-slate-500">{e.JobRole}</div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="truncate text-lg font-bold text-slate-900">{e.name}</div>
+                <div className="truncate text-sm text-slate-500">{e.JobRole}</div>
+              </div>
+              {/* Cached risk badge — no ML call needed to render the grid */}
+              {tier ? (
+                <span
+                  className={cx(
+                    "shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-bold",
+                    colors.soft
+                  )}
+                  title={`Attrition risk: ${e.attrition_pct}%`}
+                >
+                  {e.attrition_pct != null ? `${Math.round(e.attrition_pct)}%` : tierToRiskLabel(tier)}
+                </span>
+              ) : (
+                <span
+                  className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-400"
+                  title="No prediction cached yet — open to run inference"
+                >
+                  —
+                </span>
+              )}
+            </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <span className={cx("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm", deptPill(e.Department))}>
                 <span className="h-2 w-2 rounded-full bg-current opacity-60" />
@@ -238,13 +461,40 @@ function EmployeesView({ employees, search, setSearch }) {
 
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <button
-            onClick={() => { setSelectedId(null); setAnalysis(null); setError(null); }}
+            onClick={() => { setSelectedId(null); setAnalysis(null); setError(null); setLastApplied(null); }}
             className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
             <ArrowRight className="h-4 w-4 rotate-180" /> Back
           </button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {analysis?._cached && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500">
+                <Database className="h-3.5 w-3.5" />
+                Cached {relativeTime(analysis._computed_at)}
+              </span>
+            )}
+            {history.some((h) => h.action === "intervention_applied") && (
+              <button
+                onClick={handleRevert}
+                disabled={reverting}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {reverting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                Undo last change
+              </button>
+            )}
+            <button
+              onClick={() => handleSelectEmployee(emp, { live: true })}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              Re-run model
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
@@ -281,6 +531,7 @@ function EmployeesView({ employees, search, setSearch }) {
               <InfoRow label="Tenure"            value={`${emp.YearsAtCompany} years`} />
               <InfoRow label="Last Promotion"   value={emp.lastPromotion} />
               <InfoRow label="Overtime"          value={emp.OverTime} />
+              <InfoRow label="Distance From Home" value={`${emp.DistanceFromHome} km`} />
               <InfoRow label="Work-Life Balance" value={`${emp.WorkLifeBalance}/4`} />
               <InfoRow label="Job Satisfaction"  value={`${emp.JobSatisfaction}/4`} />
             </div>
@@ -293,6 +544,45 @@ function EmployeesView({ employees, search, setSearch }) {
                 ))}
               </div>
             </div>
+
+            {/* Live-change history, straight from attrition_events */}
+            {history.length > 0 && (
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-700">
+                  <History className="h-3.5 w-3.5" />
+                  Change history
+                </div>
+                <div className="mt-3 space-y-2">
+                  {history.slice(0, 6).map((event) => {
+                    const improved = event.delta != null && event.delta < 0;
+                    return (
+                      <div key={event._id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-xs font-semibold text-slate-800">
+                            {event.feature_label}: {String(event.from_value)} → {String(event.to_value)}
+                          </div>
+                          {event.delta != null && (
+                            <div
+                              className={cx(
+                                "shrink-0 text-xs font-bold",
+                                improved ? "text-emerald-600" : "text-rose-600"
+                              )}
+                            >
+                              {improved ? "↓" : "↑"} {Math.abs(event.delta * 100).toFixed(1)}%
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-slate-500">
+                          {(event.prob_before * 100).toFixed(1)}% → {(event.prob_after * 100).toFixed(1)}% ·{" "}
+                          {relativeTime(event.createdAt)}
+                          {event.performedByEmail ? ` · ${event.performedByEmail}` : ""}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* RIGHT: AI analysis */}
@@ -322,8 +612,16 @@ function EmployeesView({ employees, search, setSearch }) {
             {analysis && !loading && !error && (
               <>
                 {/* Risk Header */}
-                <div className={cx("rounded-3xl p-5 text-white shadow-sm", colors.header)}>
-                  <div className="text-sm opacity-90">Attrition Risk Score</div>
+                <div className={cx("rounded-3xl p-5 text-white shadow-sm transition-colors duration-500", colors.header)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-sm opacity-90">Attrition Risk Score</div>
+                    {analysis._interventions_applied > 0 && (
+                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold">
+                        {analysis._interventions_applied} intervention
+                        {analysis._interventions_applied > 1 ? "s" : ""} applied
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-1 text-4xl font-extrabold tracking-tight">
                     {pct?.toFixed(1)}%
                   </div>
@@ -337,10 +635,92 @@ function EmployeesView({ employees, search, setSearch }) {
                       style={{ width: `${Math.min(pct, 100)}%` }}
                     />
                   </div>
-                  <div className="mt-2 text-xs text-white/70">Company baseline: ~16%</div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-white/70">
+                    <span>Company baseline: ~16%</span>
+                    {analysis._baseline_probability != null &&
+                      Math.abs(analysis._baseline_probability - analysis.attrition_prob) > 0.001 && (
+                        <span className="font-semibold text-white/90">
+                          was {(analysis._baseline_probability * 100).toFixed(1)}%
+                        </span>
+                      )}
+                  </div>
                 </div>
 
+                {/* Live intervention outcome banner */}
+                {lastApplied && (
+                  <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                        <Zap className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-emerald-800">Applied and saved to MongoDB</div>
+                        <div className="mt-0.5 text-xs text-emerald-700">
+                          {lastApplied.feature_label}: {String(lastApplied.from_value)} →{" "}
+                          {String(lastApplied.to_value)}
+                        </div>
+                        <div className="mt-1 text-xs font-semibold text-slate-700">
+                          {(lastApplied.prob_before * 100).toFixed(1)}% →{" "}
+                          <span className={lastApplied.delta < 0 ? "text-emerald-700" : "text-rose-700"}>
+                            {(lastApplied.prob_after * 100).toFixed(1)}%
+                          </span>
+                          {lastApplied.delta != null && (
+                            <span className={cx("ml-2", lastApplied.delta < 0 ? "text-emerald-600" : "text-rose-600")}>
+                              ({lastApplied.delta < 0 ? "↓" : "↑"} {Math.abs(lastApplied.delta * 100).toFixed(1)} pts)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
+                {applyError && (
+                  <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+                    <div className="text-sm text-rose-700">{applyError}</div>
+                  </div>
+                )}
+
+                {/* Primary reason */}
+                {analysis.primary_reason && analysis.primary_reason !== "N/A" && (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-base font-bold text-slate-900">Primary Driver</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          Stage-2 model's most likely reason for leaving.
+                        </div>
+                      </div>
+                      <span
+                        className={cx(
+                          "shrink-0 rounded-full border px-3 py-1 text-sm font-semibold",
+                          getPrimaryReasonColor(analysis.primary_reason)
+                        )}
+                      >
+                        {analysis.primary_reason}
+                      </span>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {Object.entries(analysis.reason_probs || {})
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([reason, probability]) => (
+                          <div key={reason} className="flex items-center gap-3">
+                            <span className="w-28 shrink-0 text-xs text-slate-600">{reason}</span>
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className="h-full rounded-full bg-slate-400 transition-all duration-500"
+                                style={{ width: `${Math.min(probability * 100, 100)}%` }}
+                              />
+                            </div>
+                            <span className="w-12 shrink-0 text-right font-mono text-xs text-slate-600">
+                              {(probability * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* SHAP Top-5 */}
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -398,6 +778,7 @@ function EmployeesView({ employees, search, setSearch }) {
                     <div className="text-base font-bold text-slate-900">Intervention Plans</div>
                     <div className="text-xs text-slate-500 mt-1 mb-4">
                       Counterfactual scenarios — what HR can do to reduce this employee's attrition risk.
+                      <span className="font-medium text-slate-600"> Apply writes the change to MongoDB and re-runs the model.</span>
                     </div>
                     <div className="space-y-3">
                       {plans.map((plan, idx) => {
@@ -425,14 +806,49 @@ function EmployeesView({ employees, search, setSearch }) {
                               </div>
                             </div>
                             <div className="space-y-2">
-                              {plan.changes.map((chg, ci) => (
-                                <div key={ci} className="rounded-xl bg-white border border-slate-200 px-3 py-2">
-                                  <div className="text-sm text-slate-800 font-medium">{chg.intervention_label}</div>
-                                  <div className="text-xs text-slate-500 mt-0.5">
-                                    {chg.feature_label}: {chg.current_value} → {chg.suggested_value}
+                              {plan.changes.map((chg, ci) => {
+                                const isApplying = applying === chg.feature_changed;
+                                const alreadyApplied = chg.applied;
+                                return (
+                                  <div key={ci} className="rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="text-sm text-slate-800 font-medium">{chg.intervention_label}</div>
+                                        <div className="text-xs text-slate-500 mt-0.5">
+                                          {chg.feature_label}: {chg.current_value} → {chg.suggested_value}
+                                        </div>
+                                      </div>
+
+                                      {alreadyApplied ? (
+                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700">
+                                          <CheckCircle2 className="h-3.5 w-3.5" />
+                                          Applied
+                                        </span>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleApplyIntervention(chg, plan)}
+                                          disabled={applying !== null}
+                                          title="Write this change to MongoDB and re-run the attrition model"
+                                          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                          {isApplying ? (
+                                            <>
+                                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                              Applying
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Zap className="h-3.5 w-3.5" />
+                                              Apply live
+                                            </>
+                                          )}
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -466,32 +882,48 @@ function EmployeesView({ employees, search, setSearch }) {
           <>
             {/* Filters */}
             <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="flex flex-wrap items-center justify-start gap-3">
-                <button
-                  className="inline-flex min-w-[160px] items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                  onClick={() => setDept((d) => d === "All Department" ? "Sales" : "All Department")}
-                >
-                  <Filter className="h-4 w-4 text-slate-500" />
-                  {dept}
-                  <ChevronDown className="h-4 w-4 text-slate-500" />
-                </button>
-                <button
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                  onClick={() => setMode((m) => m === "All Mode" ? "Hybrid" : "All Mode")}
-                >
-                  <Users className="h-4 w-4 text-slate-500" />
-                  {mode}
-                  <ChevronDown className="h-4 w-4 text-slate-500" />
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Dropdown icon={Filter} value={dept} options={departments} onChange={setDept} minWidth={200} />
+                  <Dropdown icon={Users} value={mode} options={workModes} onChange={setMode} minWidth={150} />
+                  <Dropdown icon={AlertTriangle} value={riskFilter} options={riskTiers} onChange={setRiskFilter} minWidth={150} />
+                  {(dept !== "All Department" || mode !== "All Mode" || riskFilter !== "All Risk") && (
+                    <button
+                      onClick={() => {
+                        setDept("All Department");
+                        setMode("All Mode");
+                        setRiskFilter("All Risk");
+                      }}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+                <Pill className="border border-slate-200 bg-slate-100 text-slate-700">
+                  {filtered.length} of {employees.length} employees
+                </Pill>
               </div>
             </div>
 
             <div className="mt-6">
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {filtered.map((e) => (
-                  <EmployeeCard key={e.id} e={e} />
-                ))}
-              </div>
+              {filtered.length === 0 ? (
+                <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center">
+                  <Users className="mx-auto h-10 w-10 text-slate-300" />
+                  <div className="mt-3 text-sm font-semibold text-slate-700">No employees match these filters</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {employees.length === 0
+                      ? "Run `npm run db:seed` to load the dataset into MongoDB."
+                      : "Try clearing the search or filters."}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {filtered.map((e) => (
+                    <EmployeeCard key={e.id} e={e} />
+                  ))}
+                </div>
+              )}
             </div>
           </>
         ) : (
