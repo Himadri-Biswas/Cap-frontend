@@ -10,7 +10,7 @@
  *      skills the system actually parsed out of their document.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
   ArrowRight,
@@ -28,6 +28,8 @@ import {
   XCircle,
 } from "lucide-react";
 import Modal from "../../components/ui/Modal.jsx";
+import { Page } from "../../components/Motion.jsx";
+import { PageIntro } from "../../components/Section.jsx";
 import Pill from "../../components/ui/Pill.jsx";
 import CvViewer from "../../components/CvViewer.jsx";
 import CvLibrary, { formatFileSize } from "./CvLibrary.jsx";
@@ -38,14 +40,14 @@ import { api, ApiError } from "../../lib/api.js";
 import { useSession } from "../../auth/SessionProvider.jsx";
 
 const STATUS_STYLE = {
-  submitted: { cls: "border-slate-200 bg-slate-100 text-slate-600", label: "Submitted" },
+  submitted: { cls: "border-ink-600 bg-ink-750 text-mist-400", label: "Submitted" },
   under_review: { cls: "border-sky-200 bg-sky-50 text-sky-700", label: "Under review" },
-  shortlisted: { cls: "border-emerald-200 bg-emerald-50 text-emerald-700", label: "Shortlisted" },
-  interview: { cls: "border-indigo-200 bg-indigo-50 text-indigo-700", label: "Interview" },
-  offered: { cls: "border-violet-200 bg-violet-50 text-violet-700", label: "Offer" },
-  hired: { cls: "border-emerald-300 bg-emerald-100 text-emerald-800", label: "Hired" },
-  rejected: { cls: "border-rose-200 bg-rose-50 text-rose-700", label: "Not selected" },
-  withdrawn: { cls: "border-slate-200 bg-slate-100 text-slate-500", label: "Withdrawn" },
+  shortlisted: { cls: "border-ok/35 bg-ok/12 text-ok", label: "Shortlisted" },
+  interview: { cls: "border-brand/35 bg-brand/12 text-brand-hi", label: "Interview" },
+  offered: { cls: "border-brand/35 bg-brand/12 text-brand-hi", label: "Offer" },
+  hired: { cls: "border-ok/35 bg-ok/12 text-ok", label: "Hired" },
+  rejected: { cls: "border-risk/35 bg-risk/12 text-risk", label: "Not selected" },
+  withdrawn: { cls: "border-ink-600 bg-ink-750 text-mist-500", label: "Withdrawn" },
 };
 
 function deadlinePassed(deadline) {
@@ -121,11 +123,8 @@ export default function ApplicantPortal() {
   const activeCount = applications.filter((a) => !["rejected", "withdrawn"].includes(a.status)).length;
 
   return (
-    <div className="min-h-screen bg-[#F7F9FC]">
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-28 -left-28 h-96 w-96 rounded-full bg-indigo-200/45 blur-3xl" />
-        <div className="absolute -bottom-28 -right-28 h-96 w-96 rounded-full bg-sky-200/45 blur-3xl" />
-      </div>
+    <div className="grain relative min-h-screen bg-ink-900">
+      <div className="aurora" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-5xl p-4">
         {/* Header */}
@@ -133,18 +132,18 @@ export default function ApplicantPortal() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25 }}
-          className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
+          className="rounded-panel border border-ink-600 bg-ink-800 p-4"
         >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-sky-500 font-black text-white">
+              <div className="flex h-11 w-11 items-center justify-center rounded-tile font-black text-paper">
                 HR
               </div>
               <div>
-                <div className="text-lg font-bold tracking-tight text-slate-900">
+                <div className="text-lg font-bold tracking-tight text-paper">
                   Hi {user?.firstName || user?.email?.split("@")[0]}
                 </div>
-                <div className="text-sm text-slate-500">
+                <div className="text-sm text-mist-500">
                   {activeCount ? `${activeCount} active application${activeCount > 1 ? "s" : ""}` : "Find your next role"}
                 </div>
               </div>
@@ -159,7 +158,7 @@ export default function ApplicantPortal() {
 
         {/* Tabs */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+          <div className="inline-flex rounded-tile border border-ink-600 bg-ink-800 p-1">
             {[
               { key: "jobs", label: "Open roles", count: jobs.filter((j) => !deadlinePassed(j.deadline)).length },
               { key: "applications", label: "My applications", count: applications.length },
@@ -169,15 +168,15 @@ export default function ApplicantPortal() {
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 className={cx(
-                  "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition",
-                  tab === t.key ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                  "inline-flex items-center gap-2 rounded-tile px-4 py-2 text-sm font-semibold transition",
+                  tab === t.key ? "bg-brand text-paper " : "text-mist-400 hover:bg-ink-750"
                 )}
               >
                 {t.label}
                 <span
                   className={cx(
                     "rounded-full px-1.5 text-[10px] font-bold",
-                    tab === t.key ? "bg-white/20" : "bg-slate-100 text-slate-600"
+                    tab === t.key ? "bg-ink-800/20" : "bg-ink-750 text-mist-400"
                   )}
                 >
                   {t.count}
@@ -187,31 +186,35 @@ export default function ApplicantPortal() {
           </div>
 
           {tab === "jobs" && (
-            <div className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-80">
-              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+            <div className="flex w-full items-center gap-2 rounded-tile border border-ink-600 bg-ink-800 px-3 py-2 sm:w-80">
+              <Search className="h-4 w-4 shrink-0 text-mist-600" aria-hidden="true" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                type="search"
+                aria-label="Search open roles"
                 placeholder="Search roles, skills, locations…"
-                className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                className="w-full bg-transparent text-sm text-paper outline-none placeholder:text-mist-600"
               />
             </div>
           )}
         </div>
 
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-3xl border border-rose-200 bg-rose-50 p-4">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
-            <div className="flex-1 text-sm text-rose-700">{error}</div>
-            <button onClick={load} className="text-xs font-semibold text-rose-700 underline">
+          <div className="mt-4 flex items-start gap-2 rounded-panel border border-risk/35 bg-risk/12 p-4">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-risk" aria-hidden="true" />
+            <div className="flex-1 text-sm text-risk">{error}</div>
+            <button onClick={load} className="text-xs font-semibold text-risk underline">
               Retry
             </button>
           </div>
         )}
 
+        <AnimatePresence mode="wait" initial={false}>
+        <Page key={loading ? "loading" : tab}>
         {loading ? (
-          <div className="mt-4 flex items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white p-16 text-sm text-slate-500 shadow-sm">
-            <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
+          <div className="mt-4 flex items-center justify-center gap-3 rounded-panel border border-ink-600 bg-ink-800 p-16 text-sm text-mist-500">
+            <Loader2 className="h-5 w-5 animate-spin text-brand-hi" aria-hidden="true" />
             Loading…
           </div>
         ) : tab === "jobs" ? (
@@ -249,6 +252,8 @@ export default function ApplicantPortal() {
         ) : (
           <ProfileTab user={user} cvs={cvs} onCvsChange={setCvs} onSaved={refresh} />
         )}
+        </Page>
+        </AnimatePresence>
       </div>
 
       <ApplyModal
@@ -288,26 +293,26 @@ export default function ApplicantPortal() {
               >
                 {STATUS_STYLE[detail.status]?.label || detail.status}
               </span>
-              <Pill className="border border-slate-200 bg-slate-50 text-slate-600">
+              <Pill className="border border-ink-600 bg-ink-850 text-mist-400">
                 {detail.skillCount} skills extracted
               </Pill>
               {detail.matchPct ? (
-                <Pill className="border border-indigo-200 bg-indigo-50 text-indigo-700">
+                <Pill className="border border-brand/35 bg-brand/12 text-brand-hi">
                   {detail.matchPct}% skill match
                 </Pill>
               ) : null}
             </div>
 
             {detail.skills?.length > 0 && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+              <div className="rounded-tile border border-ink-600 bg-ink-850 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-mist-400">
                   Skills we found in your CV
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {detail.skills.map((s) => (
                     <span
                       key={s}
-                      className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs text-slate-700"
+                      className="rounded-full border border-ink-600 bg-ink-800 px-2.5 py-0.5 text-xs text-mist-200"
                     >
                       {s}
                     </span>
@@ -317,15 +322,15 @@ export default function ApplicantPortal() {
             )}
 
             {detail.statusHistory?.length > 0 && (
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">Timeline</div>
+              <div className="rounded-tile border border-ink-600 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-mist-400">Timeline</div>
                 <div className="mt-3 space-y-2">
                   {detail.statusHistory.map((h, i) => (
                     <div key={i} className="flex items-center gap-3 text-xs">
                       <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-400" />
-                      <span className="font-semibold capitalize text-slate-800">{h.status.replace(/_/g, " ")}</span>
-                      <span className="text-slate-400">{new Date(h.at).toLocaleDateString()}</span>
-                      {h.note ? <span className="truncate text-slate-500">— {h.note}</span> : null}
+                      <span className="font-semibold capitalize text-paper">{h.status.replace(/_/g, " ")}</span>
+                      <span className="text-mist-600">{new Date(h.at).toLocaleDateString()}</span>
+                      {h.note ? <span className="truncate text-mist-500">— {h.note}</span> : null}
                     </div>
                   ))}
                 </div>
@@ -347,10 +352,10 @@ export default function ApplicantPortal() {
 
 function EmptyState({ icon: Icon, title, body }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-      <Icon className="mx-auto h-10 w-10 text-slate-300" />
-      <div className="mt-3 text-sm font-semibold text-slate-700">{title}</div>
-      <div className="mt-1 text-xs text-slate-500">{body}</div>
+    <div className="rounded-panel border border-ink-600 bg-ink-800 p-12 text-center">
+      <Icon className="mx-auto h-10 w-10 text-mist-700" />
+      <div className="mt-3 text-sm font-semibold text-mist-200">{title}</div>
+      <div className="mt-1 text-xs text-mist-500">{body}</div>
     </div>
   );
 }
@@ -366,45 +371,45 @@ function JobCard({ job, onApply }) {
   return (
     <div
       className={cx(
-        "rounded-3xl border bg-white p-5 shadow-sm transition",
-        closed ? "border-slate-200 opacity-70" : "border-slate-200 hover:border-indigo-200 hover:shadow-md"
+        "rounded-panel border bg-ink-800 p-5  transition",
+        closed ? "border-ink-600 opacity-70" : "border-ink-600 hover:border-brand/35 hover:"
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="text-lg font-bold tracking-tight text-slate-900">{job.title}</div>
+            <div className="text-lg font-bold tracking-tight text-paper">{job.title}</div>
             <Pill
               className={cx(
                 "border",
                 closed
-                  ? "border-rose-200 bg-rose-50 text-rose-700"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  ? "border-risk/35 bg-risk/12 text-risk"
+                  : "border-ok/35 bg-ok/12 text-ok"
               )}
             >
-              {closed ? <XCircle className="mr-1 h-3.5 w-3.5" /> : <CheckCircle2 className="mr-1 h-3.5 w-3.5" />}
+              {closed ? <XCircle className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> : <CheckCircle2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />}
               {stopped ? "No longer accepting" : closed ? "Closed" : "Open"}
             </Pill>
           </div>
 
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-mist-500">
             <span className="inline-flex items-center gap-1">
-              <Briefcase className="h-3.5 w-3.5" />
+              <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
               {job.dept}
             </span>
             <span className="inline-flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5" />
+              <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
               {job.location}
             </span>
             <span className="inline-flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
               Closes {job.deadline}
             </span>
             {job.experienceLevel ? <span>{job.experienceLevel}</span> : null}
           </div>
 
           {job.summary ? (
-            <div className="mt-3 text-sm leading-6 text-slate-600">{job.summary}</div>
+            <div className="mt-3 text-sm leading-6 text-mist-400">{job.summary}</div>
           ) : null}
 
           {job.skills?.length > 0 && (
@@ -412,7 +417,7 @@ function JobCard({ job, onApply }) {
               {job.skills.map((s) => (
                 <span
                   key={s}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs text-slate-700"
+                  className="rounded-full border border-ink-600 bg-ink-850 px-2.5 py-0.5 text-xs text-mist-200"
                 >
                   {s}
                 </span>
@@ -426,7 +431,7 @@ function JobCard({ job, onApply }) {
             <button
               disabled
               title={stopped ? "The employer stopped accepting applications for this role." : "The deadline has passed."}
-              className="cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-400"
+              className="cursor-not-allowed rounded-tile border border-ink-600 bg-ink-850 px-4 py-2 text-sm font-semibold text-mist-600"
             >
               Closed
             </button>
@@ -435,12 +440,12 @@ function JobCard({ job, onApply }) {
               <button
                 disabled
                 title={`You can re-apply in ${waiting}`}
-                className="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700"
+                className="inline-flex cursor-not-allowed items-center gap-2 rounded-tile border border-raw/35 bg-raw/12 px-4 py-2 text-sm font-semibold text-raw"
               >
-                <Clock className="h-4 w-4" />
+                <Clock className="h-4 w-4" aria-hidden="true" />
                 Re-apply in {waiting}
               </button>
-              <div className="mt-1 text-[11px] text-slate-400">
+              <div className="mt-1 text-[11px] text-mist-600">
                 Applied {new Date(applied.appliedAt).toLocaleDateString()}
               </div>
             </div>
@@ -448,22 +453,22 @@ function JobCard({ job, onApply }) {
             <div className="text-right">
               <button
                 onClick={onApply}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-2 rounded-tile border border-ink-600 bg-ink-800 px-4 py-2 text-sm font-semibold text-mist-200 hover:bg-ink-750"
               >
                 Apply again
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </button>
-              <div className="mt-1 text-[11px] text-slate-400">
+              <div className="mt-1 text-[11px] text-mist-600">
                 Last applied {new Date(applied.appliedAt).toLocaleDateString()}
               </div>
             </div>
           ) : (
             <button
               onClick={onApply}
-              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="inline-flex items-center gap-2 rounded-tile bg-brand px-4 py-2 text-sm font-semibold text-paper hover:bg-brand"
             >
               Apply
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -477,19 +482,19 @@ function ApplicationCard({ application, onOpen }) {
   return (
     <button
       onClick={onOpen}
-      className="w-full rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-200 hover:shadow-md"
+      className="w-full rounded-panel border border-ink-600 bg-ink-800 p-5 text-left transition hover:border-brand/35 hover:"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-base font-bold text-slate-900">{application.jobTitle}</div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          <div className="text-base font-bold text-paper">{application.jobTitle}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-mist-500">
             <span className="inline-flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
               Applied {new Date(application.appliedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}
             </span>
             {application.cvOriginalName ? (
               <span className="inline-flex items-center gap-1 truncate">
-                <FileText className="h-3.5 w-3.5" />
+                <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                 {application.cvOriginalName}
               </span>
             ) : null}
@@ -549,14 +554,14 @@ function ProfileTab({ user, cvs, onCvsChange, onSaved }) {
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-panel border border-ink-600 bg-ink-800 p-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
-            <UserRound className="h-5 w-5" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile bg-ink-750 text-mist-400">
+            <UserRound className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
-            <div className="text-sm font-bold text-slate-900">Your details</div>
-            <div className="text-xs text-slate-500">Sent with every application.</div>
+            <div className="text-sm font-bold text-paper">Your details</div>
+            <div className="text-xs text-mist-500">Sent with every application.</div>
           </div>
         </div>
 
@@ -577,9 +582,9 @@ function ProfileTab({ user, cvs, onCvsChange, onSaved }) {
         </div>
 
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
-            <div className="text-sm text-rose-700">{error}</div>
+          <div className="mt-4 flex items-start gap-2 rounded-tile border border-risk/35 bg-risk/12 p-3">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-risk" aria-hidden="true" />
+            <div className="text-sm text-risk">{error}</div>
           </div>
         )}
 
@@ -588,29 +593,29 @@ function ProfileTab({ user, cvs, onCvsChange, onSaved }) {
             type="button"
             onClick={save}
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-tile bg-brand px-5 py-2.5 text-sm font-semibold text-paper transition hover:bg-brand disabled:opacity-60"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             Save changes
           </button>
           {saved && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
-              <CheckCircle2 className="h-4 w-4" />
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ok">
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
               Saved
             </span>
           )}
-          <span className="ml-auto text-xs text-slate-400">{user?.email}</span>
+          <span className="ml-auto text-xs text-mist-600">{user?.email}</span>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-panel border border-ink-600 bg-ink-800 p-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
-            <FileText className="h-5 w-5" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile bg-ink-750 text-mist-400">
+            <FileText className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
-            <div className="text-sm font-bold text-slate-900">Your CVs</div>
-            <div className="text-xs text-slate-500">
+            <div className="text-sm font-bold text-paper">Your CVs</div>
+            <div className="text-xs text-mist-500">
               Choose which one to send when you apply.
             </div>
           </div>
@@ -707,7 +712,7 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
         result ? (
           <button
             onClick={onSubmitted}
-            className="w-full rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            className="w-full rounded-tile bg-brand px-4 py-2.5 text-sm font-semibold text-paper hover:bg-brand"
           >
             View my applications
           </button>
@@ -715,18 +720,18 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-tile border border-ink-600 bg-ink-800 px-4 py-2.5 text-sm font-semibold text-mist-200 hover:bg-ink-750"
             >
               Cancel
             </button>
             <button
               onClick={submit}
               disabled={submitting || blocked || checking || !selectedCvId}
-              className="flex-1 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-tile bg-brand px-4 py-2.5 text-sm font-semibold text-paper hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? (
                 <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                   Submitting…
                 </span>
               ) : (
@@ -739,28 +744,28 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
     >
       {result ? (
         <div className="space-y-4 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-            <CheckCircle2 className="h-7 w-7" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-ok/12 text-ok">
+            <CheckCircle2 className="h-7 w-7" aria-hidden="true" />
           </div>
           <div>
-            <div className="text-base font-bold text-slate-900">You're in the running</div>
-            <div className="mt-1 text-sm text-slate-600">
+            <div className="text-base font-bold text-paper">You're in the running</div>
+            <div className="mt-1 text-sm text-mist-400">
               Application <span className="font-mono font-semibold">{result.application.applicationId}</span> for{" "}
               {result.application.jobTitle}.
             </div>
           </div>
 
           {result.application.skills?.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
-                <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+            <div className="rounded-tile border border-ink-600 bg-ink-850 p-4 text-left">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-mist-400">
+                <Sparkles className="h-3.5 w-3.5 text-brand-hi" aria-hidden="true" />
                 {result.application.skills.length} skills extracted from your CV
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {result.application.skills.slice(0, 20).map((s) => (
                   <span
                     key={s}
-                    className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs text-indigo-700"
+                    className="rounded-full border border-brand/35 bg-brand/12 px-2.5 py-0.5 text-xs text-brand-hi"
                   >
                     {s}
                   </span>
@@ -770,14 +775,14 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
           )}
 
           {result.warning && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-800">
+            <div className="rounded-tile border border-raw/35 bg-raw/12 p-3 text-left text-xs text-raw">
               {result.warning}
             </div>
           )}
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 text-left text-xs text-slate-500">
+          <div className="rounded-tile border border-ink-600 bg-ink-800 p-3 text-left text-xs text-mist-500">
             You can apply to this role again after{" "}
-            <span className="font-semibold text-slate-700">
+            <span className="font-semibold text-mist-200">
               {new Date(result.application.nextEligibleAt).toLocaleString()}
             </span>
             .
@@ -786,21 +791,21 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
       ) : (
         <div className="space-y-4">
           {checking && (
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <Loader2 className="h-4 w-4 animate-spin" /> Checking eligibility…
+            <div className="flex items-center gap-2 text-sm text-mist-500">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Checking eligibility…
             </div>
           )}
 
           {blocked && (
-            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <Clock className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div className="flex items-start gap-3 rounded-tile border border-raw/35 bg-raw/12 p-4">
+              <Clock className="mt-0.5 h-5 w-5 shrink-0 text-raw" aria-hidden="true" />
               <div>
-                <div className="text-sm font-bold text-amber-800">
+                <div className="text-sm font-bold text-raw">
                   {waiting ? `You can re-apply in ${waiting}` : "You can't apply right now"}
                 </div>
-                <div className="mt-1 text-xs leading-5 text-amber-700">{eligibility.reason}</div>
+                <div className="mt-1 text-xs leading-5 text-raw">{eligibility.reason}</div>
                 {eligibility.cooldownHours ? (
-                  <div className="mt-1 text-[11px] text-amber-600">
+                  <div className="mt-1 text-[11px] text-raw">
                     Cooldown window: {eligibility.cooldownHours} hour
                     {eligibility.cooldownHours > 1 ? "s" : ""} per job post.
                   </div>
@@ -810,22 +815,22 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
           )}
 
           {error && !blocked && (
-            <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
-              <div className="text-sm text-rose-700">{error}</div>
+            <div className="flex items-start gap-2 rounded-tile border border-risk/35 bg-risk/12 p-3">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-risk" aria-hidden="true" />
+              <div className="text-sm text-risk">{error}</div>
             </div>
           )}
 
           {/* Pick a stored CV */}
           <div>
             <div className="flex items-baseline justify-between gap-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Which CV to send *</div>
-              {cvs.length > 0 && <div className="text-[11px] text-slate-400">{cvs.length} saved</div>}
+              <div className="text-xs font-semibold uppercase tracking-wider text-mist-500">Which CV to send *</div>
+              {cvs.length > 0 && <div className="text-[11px] text-mist-600">{cvs.length} saved</div>}
             </div>
 
             {cvs.length === 0 ? (
               <div className="mt-2 space-y-3">
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <div className="rounded-tile border border-raw/35 bg-raw/12 p-3 text-xs text-raw">
                   No CVs saved yet. Anything you add here is kept in your profile.
                 </div>
                 <CvLibrary cvs={cvs} onChange={handleCvsChange} compact />
@@ -844,31 +849,31 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
                         setError(null);
                       }}
                       className={cx(
-                        "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition disabled:opacity-50",
+                        "flex w-full items-center gap-3 rounded-tile border p-3 text-left transition disabled:opacity-50",
                         active
-                          ? "border-indigo-300 bg-indigo-50/70 ring-2 ring-indigo-200"
-                          : "border-slate-200 bg-white hover:bg-slate-50"
+                          ? "border-brand/35 bg-brand/12/70 ring-2 ring-brand/30"
+                          : "border-ink-600 bg-ink-800 hover:bg-ink-750"
                       )}
                     >
                       <div
                         className={cx(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                          active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-tile",
+                          active ? "bg-brand text-paper" : "bg-ink-750 text-mist-500"
                         )}
                       >
-                        {active ? <CheckCircle2 className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                        {active ? <CheckCircle2 className="h-5 w-5" aria-hidden="true" /> : <FileText className="h-5 w-5" aria-hidden="true" />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="truncate text-sm font-semibold text-slate-900">{cv.originalName}</span>
+                          <span className="truncate text-sm font-semibold text-paper">{cv.originalName}</span>
                           {cv.isDefault && (
-                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-indigo-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                              <Star className="h-2.5 w-2.5 fill-current" />
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-brand/35 bg-ink-800 px-1.5 py-0.5 text-[10px] font-bold text-brand-hi">
+                              <Star className="h-2.5 w-2.5 fill-current" aria-hidden="true" />
                               Default
                             </span>
                           )}
                         </div>
-                        <div className="mt-0.5 text-[11px] text-slate-500">
+                        <div className="mt-0.5 text-[11px] text-mist-500">
                           {formatFileSize(cv.sizeBytes)}
                           {cv.extractionStatus === "done" ? ` · ${cv.skillCount} skills already read` : " · skills not read yet"}
                         </div>
@@ -885,14 +890,14 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
           </div>
 
           {/* Everything else came from the profile — shown, not re-asked */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="rounded-tile border border-ink-600 bg-ink-850 p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Applying as</div>
-                <div className="mt-1 truncate text-sm font-semibold text-slate-900">
+                <div className="text-xs font-semibold uppercase tracking-wider text-mist-500">Applying as</div>
+                <div className="mt-1 truncate text-sm font-semibold text-paper">
                   {user?.fullName || user?.email}
                 </div>
-                <div className="mt-0.5 text-[11px] leading-5 text-slate-500">
+                <div className="mt-0.5 text-[11px] leading-5 text-mist-500">
                   {[
                     user?.email,
                     user?.phone,
@@ -907,7 +912,7 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
               <button
                 type="button"
                 onClick={onEditProfile}
-                className="shrink-0 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                className="shrink-0 text-xs font-semibold text-brand-hi hover:text-brand-hi"
               >
                 Edit
               </button>
@@ -915,15 +920,15 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
           </div>
 
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Cover letter <span className="normal-case text-slate-400">(optional, specific to this role)</span>
+            <div className="text-xs font-semibold uppercase tracking-wider text-mist-500">
+              Cover letter <span className="normal-case text-mist-600">(optional, specific to this role)</span>
             </div>
             <textarea
               rows={4}
               value={coverLetter}
               onChange={(e) => setCoverLetter(e.target.value)}
               placeholder="Why are you a good fit for this role?"
-              className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-300"
+              className="mt-2 w-full resize-none rounded-tile border border-ink-600 bg-ink-800 px-3 py-2.5 text-sm text-paper outline-none transition placeholder:text-mist-600 focus:border-brand/35"
             />
           </div>
         </div>
@@ -935,12 +940,12 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
 function Field({ label, value, onChange, type = "text" }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">{label}</span>
       <input
         type={type}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-300"
+        className="mt-1.5 h-10 w-full rounded-tile border border-ink-600 bg-ink-800 px-3 text-sm text-paper outline-none transition focus:border-brand/35"
       />
     </label>
   );

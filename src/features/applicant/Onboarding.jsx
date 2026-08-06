@@ -87,27 +87,24 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F9FC]">
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-28 -left-28 h-96 w-96 rounded-full bg-indigo-200/45 blur-3xl" />
-        <div className="absolute -bottom-28 -right-28 h-96 w-96 rounded-full bg-sky-200/45 blur-3xl" />
-      </div>
+    <div className="grain relative min-h-screen bg-ink-900">
+      <div className="aurora" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-2xl p-4 py-10">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25 }}
-          className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+          className="rounded-[32px] border border-ink-600 bg-ink-800 p-6 sm:p-8"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-xl font-bold tracking-tight text-slate-900">Set up your account</div>
-              <div className="mt-1 text-sm text-slate-500">
+              <div className="text-xl font-bold tracking-tight text-paper">Set up your account</div>
+              <div className="mt-1 text-sm text-mist-500">
                 Your details and CVs, saved once and reused on every application.
               </div>
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-sky-500 font-black text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-tile font-black text-paper">
               HR
             </div>
           </div>
@@ -122,27 +119,27 @@ export default function Onboarding() {
                 <React.Fragment key={s.key}>
                   <div
                     className={cx(
-                      "inline-flex items-center gap-2 rounded-2xl px-3 py-1.5 text-xs font-semibold transition",
+                      "inline-flex items-center gap-2 rounded-tile px-3 py-1.5 text-xs font-semibold transition",
                       active
-                        ? "bg-indigo-600 text-white"
+                        ? "bg-brand text-paper"
                         : done
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-100 text-slate-500"
+                          ? "bg-ok/12 text-ok"
+                          : "bg-ink-750 text-mist-500"
                     )}
                   >
-                    {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
+                    {done ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Icon className="h-3.5 w-3.5" />}
                     {s.label}
                   </div>
-                  {i < STEPS.length - 1 && <div className="h-px flex-1 bg-slate-200" />}
+                  {i < STEPS.length - 1 && <div className="h-px flex-1 bg-ink-700" />}
                 </React.Fragment>
               );
             })}
           </div>
 
           {error && (
-            <div className="mt-5 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
-              <div className="text-sm text-rose-700">{error}</div>
+            <div className="mt-5 flex items-start gap-2 rounded-tile border border-risk/35 bg-risk/12 p-3">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-risk" aria-hidden="true" />
+              <div className="text-sm text-risk">{error}</div>
             </div>
           )}
 
@@ -169,15 +166,15 @@ export default function Onboarding() {
                 <Field label="Portfolio / GitHub" value={form.portfolioUrl} onChange={set("portfolioUrl")} />
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                Signed in as <span className="font-semibold text-slate-700">{user?.email}</span>. First name required.
+              <div className="rounded-tile border border-ink-600 bg-ink-850 px-4 py-3 text-xs text-mist-500">
+                Signed in as <span className="font-semibold text-mist-200">{user?.email}</span>. First name required.
               </div>
 
               <div className="flex items-center justify-between gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => signOut()}
-                  className="text-xs font-semibold text-slate-400 hover:text-slate-600"
+                  className="text-xs font-semibold text-mist-600 hover:text-mist-400"
                 >
                   Sign out
                 </button>
@@ -185,19 +182,19 @@ export default function Onboarding() {
                   type="button"
                   onClick={goToCvs}
                   disabled={saving}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-tile bg-brand px-5 py-2.5 text-sm font-semibold text-paper transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                   Next
-                  {!saving && <ArrowRight className="h-4 w-4" />}
+                  {!saving && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
                 </button>
               </div>
             </div>
           ) : (
             <div className="mt-6 space-y-4">
               <div>
-                <div className="text-sm font-bold text-slate-900">Add your CVs</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">
+                <div className="text-sm font-bold text-paper">Add your CVs</div>
+                <div className="mt-1 text-xs leading-5 text-mist-500">
                   Skills are read from each CV on upload. You choose which one to send when you apply.
                 </div>
               </div>
@@ -208,9 +205,9 @@ export default function Onboarding() {
                 <button
                   type="button"
                   onClick={() => setStep(0)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-mist-500 hover:text-mist-200"
                 >
-                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                   Back
                 </button>
                 <div className="flex items-center gap-3">
@@ -219,7 +216,7 @@ export default function Onboarding() {
                       type="button"
                       onClick={finish}
                       disabled={saving}
-                      className="text-xs font-semibold text-slate-400 hover:text-slate-600 disabled:opacity-60"
+                      className="text-xs font-semibold text-mist-600 hover:text-mist-400 disabled:opacity-60"
                     >
                       Skip for now
                     </button>
@@ -228,11 +225,11 @@ export default function Onboarding() {
                     type="button"
                     onClick={finish}
                     disabled={saving}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-tile bg-brand px-5 py-2.5 text-sm font-semibold text-paper transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                     {cvs.length ? "Browse open roles" : "Continue without a CV"}
-                    {!saving && <ArrowRight className="h-4 w-4" />}
+                    {!saving && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
                   </button>
                 </div>
               </div>
@@ -247,13 +244,13 @@ export default function Onboarding() {
 function Field({ label, value, onChange, type = "text", placeholder = "" }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">{label}</span>
       <input
         type={type}
         value={value ?? ""}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-indigo-300"
+        className="mt-1.5 h-11 w-full rounded-tile border border-ink-600 bg-ink-800 px-3 text-sm text-paper outline-none transition placeholder:text-mist-700 focus:border-brand/35"
       />
     </label>
   );

@@ -31,12 +31,12 @@ function buildJdText(job) {
 }
 
 const CRITICALITY_TONE = {
-  required: "border-rose-200 bg-rose-50 text-rose-700",
-  strong: "border-orange-200 bg-orange-50 text-orange-700",
-  preferred: "border-amber-200 bg-amber-50 text-amber-700",
+  required: "border-risk/35 bg-risk/12 text-risk",
+  strong: "border-ink-500 bg-ink-750 text-mist-200",
+  preferred: "border-raw/35 bg-raw/12 text-raw",
   nice_to_have: "border-sky-200 bg-sky-50 text-sky-700",
-  optional: "border-slate-200 bg-slate-50 text-slate-600",
-  inferred: "border-slate-200 bg-slate-50 text-slate-600",
+  optional: "border-ink-600 bg-ink-850 text-mist-400",
+  inferred: "border-ink-600 bg-ink-850 text-mist-400",
 };
 
 function UpskillingView({ jobs, employees, search, setSearch }) {
@@ -190,12 +190,12 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
   const resumeSkills = result?.resume_skills || [];
 
   return (
-    <div className="rounded-[28px] overflow-hidden border border-slate-200 bg-white shadow-sm">
-      <div className="bg-gradient-to-b from-white to-slate-50 p-6">
+    <div className="rounded-[28px] overflow-hidden border border-ink-600 bg-ink-800">
+      <div className="bg-ink-800 p-6">
         <div className="grid items-start gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="h-[560px] rounded-3xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
+          <div className="h-[560px] rounded-panel border border-ink-600 bg-ink-800 p-4 flex flex-col">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-900">Select target job</div>
+              <div className="text-sm font-semibold text-paper">Select target job</div>
               {(jobMode === "select" ? selectedTargetJob : customJobDescription) && (
                 <button
                   onClick={() => {
@@ -207,14 +207,14 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                       setCustomJobChecked(false);
                     }
                   }}
-                  className="text-xs text-slate-500 hover:text-slate-700"
+                  className="text-xs text-mist-500 hover:text-mist-200"
                 >
                   Clear
                 </button>
               )}
             </div>
 
-            <div className="mt-3 inline-flex rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-sky-50 to-violet-50 p-1">
+            <div className="mt-3 inline-flex rounded-tile border border-brand/35 to-violet-50 p-1">
               <button
                 onClick={() => {
                   setJobMode("select");
@@ -223,7 +223,7 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                 }}
                 className={cx(
                   "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
-                  jobMode === "select" ? "bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-sm" : "text-slate-700 hover:bg-white/70"
+                  jobMode === "select" ? "  to-violet-500 text-paper " : "text-mist-200 hover:bg-ink-800/70"
                 )}
               >
                 Select Job
@@ -236,7 +236,7 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                 }}
                 className={cx(
                   "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
-                  jobMode === "custom" ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-sm" : "text-slate-700 hover:bg-white/70"
+                  jobMode === "custom" ? " from-cyan-500 to-blue-500 text-paper " : "text-mist-200 hover:bg-ink-800/70"
                 )}
               >
                 Custom Job
@@ -255,13 +255,13 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                         resetResult();
                       }}
                       className={cx(
-                        "w-full rounded-2xl border p-4 text-left transition duration-150",
+                        "w-full rounded-tile border p-4 text-left transition duration-150",
                         active
-                          ? "border-indigo-300 bg-gradient-to-br from-indigo-50 to-sky-50 ring-2 ring-indigo-100 shadow-sm"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          ? "border-brand/35    ring-2 ring-indigo-100 "
+                          : "border-ink-600 bg-ink-800 hover:border-ink-400 hover:bg-ink-750"
                       )}
                     >
-                      <div className="font-semibold text-slate-900">{j.title}</div>
+                      <div className="font-semibold text-paper">{j.title}</div>
                     </button>
                   );
                 })}
@@ -276,13 +276,13 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                     resetResult();
                   }}
                   rows={5}
-                  className="w-full flex-1 min-h-[220px] resize-none rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-300"
-                  placeholder="Write job description (responsibilities, required skills, tools, experience)..."
+                  className="w-full flex-1 min-h-[220px] resize-none rounded-tile border border-ink-600 bg-ink-800 p-3 text-sm text-paper outline-none placeholder:text-mist-600 focus:border-brand/35"
+                  placeholder="Write job description (responsibilities, required skills, tools, experience)…"
                 />
 
                 <Button
                   onClick={() => setCustomJobChecked(true)}
-                  className="w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-tile bg-brand hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={!customJobDescription.trim()}
                 >
                   Check Now
@@ -291,16 +291,16 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
             )}
           </div>
 
-          <div className="h-[560px] rounded-3xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
+          <div className="h-[560px] rounded-panel border border-ink-600 bg-ink-800 p-4 flex flex-col">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-900">Select employee</div>
+              <div className="text-sm font-semibold text-paper">Select employee</div>
               {selectedEmployee && (
                 <button
                   onClick={() => {
                     setEmployeeId(null);
                     resetResult();
                   }}
-                  className="text-xs text-slate-500 hover:text-slate-700"
+                  className="text-xs text-mist-500 hover:text-mist-200"
                 >
                   Clear
                 </button>
@@ -317,25 +317,25 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                       resetResult();
                     }}
                     className={cx(
-                      "rounded-2xl border p-3 text-left transition duration-150",
+                      "rounded-tile border p-3 text-left transition duration-150",
                       active
-                        ? "border-indigo-300 bg-gradient-to-br from-indigo-50 to-sky-50 ring-2 ring-indigo-100 shadow-sm"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        ? "border-brand/35    ring-2 ring-indigo-100 "
+                        : "border-ink-600 bg-ink-800 hover:border-ink-400 hover:bg-ink-750"
                     )}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold">
+                      <div className="h-10 w-10 rounded-full flex items-center justify-center text-paper font-bold">
                         {e.initials}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-bold text-slate-900">{e.name}</div>
+                        <div className="text-sm font-bold text-paper">{e.name}</div>
                         <div className="mt-1">
                           <span className="inline-flex max-w-full truncate rounded-full border border-sky-100 bg-sky-50 px-2.5 py-0.5 text-[11px] font-medium text-sky-700">
                             {e.JobRole}
                           </span>
                         </div>
                         <div className="mt-1 flex items-center gap-2">
-                          <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                          <span className="rounded-full border border-emerald-100 bg-ok/12 px-2 py-0.5 text-[11px] font-medium text-ok">
                             {e.Department}
                           </span>
                         </div>
@@ -353,20 +353,20 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
             <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-sm font-semibold text-slate-900">Recommended learning path</div>
+                  <div className="text-sm font-semibold text-paper">Recommended learning path</div>
                   {saved && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                      <Database className="h-3 w-3" />
+                    <span className="inline-flex items-center gap-1 rounded-full border border-ok/35 bg-ok/12 px-2 py-0.5 text-[10px] font-semibold text-ok">
+                      <Database className="h-3 w-3" aria-hidden="true" />
                       Saved to MongoDB
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-slate-500 mt-1">
+                <div className="text-xs text-mist-500 mt-1">
                   {selectedEmployee.name}: {selectedEmployee.JobRole} {"->"} {activeJobTitle}
                 </div>
                 {pastPaths.length > 0 && (
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-slate-400">
-                    <History className="h-3 w-3" />
+                  <div className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-mist-600">
+                    <History className="h-3 w-3" aria-hidden="true" />
                     {pastPaths.length} earlier path{pastPaths.length > 1 ? "s" : ""} for this employee
                     {pastPaths[0]?.jobReadiness != null
                       ? ` · last readiness ${pastPaths[0].jobReadiness}%`
@@ -376,14 +376,14 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
+                <div className="inline-flex rounded-tile border border-ink-600 bg-ink-800 p-1">
                   {["Junior", "Mid-Level", "Senior"].map((lvl) => (
                     <button
                       key={lvl}
                       onClick={() => setLevelHint(lvl)}
                       className={cx(
                         "rounded-lg px-2.5 py-1 text-[11px] font-semibold transition",
-                        levelHint === lvl ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                        levelHint === lvl ? "bg-brand text-paper " : "text-mist-400 hover:bg-ink-750"
                       )}
                     >
                       {lvl}
@@ -392,17 +392,17 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                 </div>
                 <Button
                   onClick={handleGenerateLearningPath}
-                  className="rounded-2xl bg-indigo-600 px-4 shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-tile bg-brand px-4 hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={loading || !canGenerate}
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                       Analyzing
                     </>
                   ) : (
                     <>
-                      <Sparkles className="mr-2 h-4 w-4" />
+                      <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
                       {result ? "Regenerate" : "Generate Learning Path"}
                     </>
                   )}
@@ -411,11 +411,11 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
             </div>
 
             {error && (
-              <div className="mb-4 flex items-start gap-2 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+              <div className="mb-4 flex items-start gap-2 rounded-tile border border-risk/35 from-rose-50 to-white p-4">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-risk" aria-hidden="true" />
                 <div>
-                  <div className="text-sm font-semibold text-rose-700">Learning path generation failed</div>
-                  <div className="mt-1 text-sm text-rose-600">{error}</div>
+                  <div className="text-sm font-semibold text-risk">Learning path generation failed</div>
+                  <div className="mt-1 text-sm text-risk">{error}</div>
                   <div className="mt-1 text-xs text-rose-400">API: {MODULE2_API_URL}</div>
                 </div>
               </div>
@@ -423,62 +423,62 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-4">
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="text-sm font-semibold text-slate-900">Constraints</div>
+                <div className="rounded-panel border border-ink-600 bg-ink-800 p-5">
+                  <div className="text-sm font-semibold text-paper">Constraints</div>
                   <div className="mt-4 space-y-4">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-[11px] text-slate-500">Max time</div>
+                    <div className="rounded-tile border border-ink-600 bg-ink-850 p-3">
+                      <div className="text-[11px] text-mist-500">Max time</div>
                       <div className="mt-2 flex items-center gap-3">
-                        <input type="range" min={40} max={240} step={5} value={maxTime} onChange={(e) => setMaxTime(Number(e.target.value))} className="w-full" />
-                        <div className="text-sm font-semibold text-slate-900 w-14 text-right">{maxTime}h</div>
+                        <input type="range" min={40} max={240} step={5} value={maxTime} onChange={(e) => setMaxTime(Number(e.target.value))} aria-label="Maximum learning hours" className="w-full accent-brand" />
+                        <div className="text-sm font-semibold text-paper w-14 text-right">{maxTime}h</div>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-[11px] text-slate-500">Max budget</div>
+                    <div className="rounded-tile border border-ink-600 bg-ink-850 p-3">
+                      <div className="text-[11px] text-mist-500">Max budget</div>
                       <div className="mt-2 flex items-center gap-3">
-                        <input type="range" min={0} max={800} step={10} value={maxBudget} onChange={(e) => setMaxBudget(Number(e.target.value))} className="w-full" />
-                        <div className="text-sm font-semibold text-slate-900 w-16 text-right">${maxBudget}</div>
+                        <input type="range" min={0} max={800} step={10} value={maxBudget} onChange={(e) => setMaxBudget(Number(e.target.value))} aria-label="Maximum budget in dollars" className="w-full accent-brand" />
+                        <div className="text-sm font-semibold text-paper w-16 text-right">${maxBudget}</div>
                       </div>
                     </div>
                     {result && (
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] text-mist-600">
                         Constraints changed after generating? Click "Regenerate" to re-run.
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm min-h-[200px]">
+                <div className="rounded-panel border border-ink-600 bg-ink-800 p-5 min-h-[200px]">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold text-slate-900">Skill gap analysis</div>
+                    <div className="text-sm font-semibold text-paper">Skill gap analysis</div>
                     {result && (
-                      <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700">
+                      <span className="rounded-full border border-brand/35 bg-brand/12 px-2.5 py-0.5 text-[11px] font-semibold text-brand-hi">
                         {result.gap_analysis.job_readiness}% ready
                       </span>
                     )}
                   </div>
 
                   {!result && !loading && (
-                    <div className="mt-3 text-xs text-slate-500">
+                    <div className="mt-3 text-xs text-mist-500">
                       Click "Generate Learning Path" to run the gap analysis model.
                     </div>
                   )}
                   {loading && (
-                    <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Extracting skills and computing gaps…
+                    <div className="mt-4 flex items-center gap-2 text-xs text-mist-500">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Extracting skills and computing gaps…
                     </div>
                   )}
 
                   {result && (
                     <div className="mt-3 space-y-2">
                       {gaps.length === 0 && (
-                        <div className="text-xs text-emerald-600">No significant gaps found for this role.</div>
+                        <div className="text-xs text-ok">No significant gaps found for this role.</div>
                       )}
                       {gaps.slice(0, 8).map((g) => (
-                        <div key={g.canonical_name} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                        <div key={g.canonical_name} className="rounded-tile border border-ink-600 bg-ink-850 px-3 py-2">
                           <div className="flex items-center justify-between gap-2">
-                            <div className="text-sm font-semibold text-slate-900">{g.canonical_name}</div>
+                            <div className="text-sm font-semibold text-paper">{g.canonical_name}</div>
                             <span
                               className={cx(
                                 "rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize",
@@ -488,7 +488,7 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                               {(g.criticality_label || "preferred").replace(/_/g, " ")}
                             </span>
                           </div>
-                          <div className="mt-1 flex items-center gap-3 text-[11px] text-slate-500">
+                          <div className="mt-1 flex items-center gap-3 text-[11px] text-mist-500">
                             <span>gap {g.effective_gap.toFixed(1)}</span>
                             <span>~{Math.round(g.learning_hours_mean)}h</span>
                             <span>transfer {(g.transferability * 100).toFixed(0)}%</span>
@@ -501,9 +501,9 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
               </div>
 
               <div className="space-y-4">
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm min-h-[200px]">
-                  <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Current Proficiency</div>
-                  <div className="mt-2 text-xs text-slate-500">
+                <div className="rounded-panel border border-ink-600 bg-ink-800 p-5 min-h-[200px]">
+                  <div className="text-xs font-semibold text-mist-200 uppercase tracking-wider">Current Proficiency</div>
+                  <div className="mt-2 text-xs text-mist-500">
                     {result ? `Extracted from ${selectedEmployee.name}'s profile` : `From ${selectedEmployee.name}'s profile`}
                   </div>
 
@@ -524,7 +524,7 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                   ) : (
                     <div className="mt-3 space-y-1.5">
                       {resumeSkills.length === 0 && (
-                        <div className="text-xs text-slate-500">No skills were extracted from this profile.</div>
+                        <div className="text-xs text-mist-500">No skills were extracted from this profile.</div>
                       )}
                       {resumeSkills.slice(0, 10).map((s, idx) => (
                         <div key={s.canonical_name} className="flex items-center gap-2">
@@ -536,31 +536,31 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                           >
                             {s.canonical_name}
                           </span>
-                          <div className="h-1.5 flex-1 rounded-full bg-slate-100">
+                          <div className="h-1.5 flex-1 rounded-full bg-ink-750">
                             <div
-                              className="h-1.5 rounded-full bg-indigo-500"
+                              className="h-1.5 rounded-full bg-brand"
                               style={{ width: `${(s.proficiency_score / 5) * 100}%` }}
                             />
                           </div>
-                          <span className="w-8 text-right text-[11px] text-slate-500">{s.proficiency_score}/5</span>
+                          <span className="w-8 text-right text-[11px] text-mist-500">{s.proficiency_score}/5</span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm min-h-[260px]">
+                <div className="rounded-panel border border-ink-600 bg-ink-800 p-5 min-h-[260px]">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-sm font-semibold text-slate-900">Ordered course path</div>
+                    <div className="text-sm font-semibold text-paper">Ordered course path</div>
                     {result && (
-                      <div className="text-xs text-slate-500 text-right shrink-0">
+                      <div className="text-xs text-mist-500 text-right shrink-0">
                         {result.learning_path.total_hours}h - ${result.learning_path.total_cost_usd}
                       </div>
                     )}
                   </div>
 
                   {!result && !loading && (
-                    <div className="mt-3 text-xs text-slate-500">
+                    <div className="mt-3 text-xs text-mist-500">
                       The recommended courses will appear here after generating a learning path.
                     </div>
                   )}
@@ -568,31 +568,31 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                   {result && (
                     <div className="mt-4 space-y-2">
                       {learningPath.length === 0 && (
-                        <div className="text-xs text-slate-500">No courses fit within the current time/budget constraints.</div>
+                        <div className="text-xs text-mist-500">No courses fit within the current time/budget constraints.</div>
                       )}
                       {learningPath.map((c, idx) => (
                         <div key={`${c.course_id}-${idx}`} className="flex items-stretch gap-3">
                           <div className="flex flex-col items-center">
-                            <div className="h-7 w-7 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center justify-center">
+                            <div className="h-7 w-7 rounded-full border border-brand/35 bg-brand/12 text-brand-hi text-xs font-bold flex items-center justify-center">
                               {idx + 1}
                             </div>
                             {idx < learningPath.length - 1 && <div className="mt-1 w-px flex-1 bg-slate-300" />}
                           </div>
-                          <div className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                          <div className="flex-1 rounded-tile border border-ink-600 bg-ink-800 px-3 py-2">
                             <div className="flex items-center justify-between gap-2">
-                              <div className="text-sm font-semibold text-slate-900">{c.course_name}</div>
+                              <div className="text-sm font-semibold text-paper">{c.course_name}</div>
                               <span
                                 className={cx(
                                   "rounded-full border px-2 py-0.5 text-[11px]",
                                   c.is_prerequisite_course
-                                    ? "border-slate-200 bg-white text-slate-600"
-                                    : "border-indigo-200 bg-indigo-50 text-indigo-700"
+                                    ? "border-ink-600 bg-ink-800 text-mist-400"
+                                    : "border-brand/35 bg-brand/12 text-brand-hi"
                                 )}
                               >
                                 {c.is_prerequisite_course ? "Prerequisite" : c.difficulty}
                               </span>
                             </div>
-                            <div className="mt-1 flex items-center gap-3 text-[11px] text-slate-500">
+                            <div className="mt-1 flex items-center gap-3 text-[11px] text-mist-500">
                               <span>{c.duration_hours}h</span>
                               <span>{c.is_free ? "Free" : `$${c.price_usd}`}</span>
                               <span>for {c.for_gap}</span>

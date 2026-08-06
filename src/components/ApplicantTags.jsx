@@ -20,8 +20,8 @@ export const TAG_META = {
     short: "Boomerang",
     icon: BadgeCheck,
     tone: "positive",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    solid: "border-emerald-300 bg-emerald-100 text-emerald-800",
+    className: "border-ok/35 bg-ok/12 text-ok",
+    solid: "border-ok/35 bg-ok/12 text-ok",
     ring: "ring-emerald-200",
     description: "Worked here before and left in good standing.",
   },
@@ -40,8 +40,8 @@ export const TAG_META = {
     short: "Re-applying",
     icon: ThumbsDown,
     tone: "negative",
-    className: "border-rose-200 bg-rose-50 text-rose-700",
-    solid: "border-rose-300 bg-rose-100 text-rose-800",
+    className: "border-risk/35 bg-risk/12 text-risk",
+    solid: "border-risk/35 bg-risk/12 text-risk",
     ring: "ring-rose-200",
     description: "Applied before and was rejected, now applying again.",
   },
@@ -50,8 +50,8 @@ export const TAG_META = {
     short: "Blocked",
     icon: Ban,
     tone: "negative",
-    className: "border-rose-300 bg-rose-100 text-rose-800",
-    solid: "border-rose-400 bg-rose-200 text-rose-900",
+    className: "border-risk/35 bg-risk/12 text-risk",
+    solid: "border-risk/35 bg-rose-200 text-risk",
     ring: "ring-rose-300",
     description: "Left the company and was flagged as not eligible for rehire.",
   },
@@ -60,9 +60,9 @@ export const TAG_META = {
     short: "Repeat",
     icon: RotateCcw,
     tone: "neutral",
-    className: "border-slate-200 bg-slate-100 text-slate-600",
-    solid: "border-slate-300 bg-slate-200 text-slate-700",
-    ring: "ring-slate-200",
+    className: "border-ink-600 bg-ink-750 text-mist-400",
+    solid: "border-ink-500 bg-ink-700 text-mist-200",
+    ring: "ring-ink-500",
     description: "Has applied to this same job post before.",
   },
 };
@@ -84,16 +84,16 @@ export function tagTone(tags = []) {
 }
 
 export const TONE_ROW_CLASS = {
-  positive: "bg-emerald-50/40 hover:bg-emerald-50/70",
-  negative: "bg-rose-50/40 hover:bg-rose-50/70",
-  mixed: "bg-amber-50/40 hover:bg-amber-50/70",
-  neutral: "hover:bg-slate-50",
+  positive: "bg-ok/12/40 hover:bg-ok/12/70",
+  negative: "bg-risk/12/40 hover:bg-risk/12/70",
+  mixed: "bg-raw/12/40 hover:bg-raw/12/70",
+  neutral: "hover:bg-ink-750",
 };
 
 export const TONE_BAR_CLASS = {
-  positive: "bg-emerald-500",
-  negative: "bg-rose-500",
-  mixed: "bg-amber-500",
+  positive: "bg-ok",
+  negative: "bg-risk",
+  mixed: "bg-raw",
   neutral: "bg-transparent",
 };
 
@@ -131,10 +131,10 @@ export function LastAppliedNote({ application }) {
   if (!application?.lastAppliedAt) return null;
   const when = new Date(application.lastAppliedAt);
   return (
-    <div className="mt-2 inline-flex items-start gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-      <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+    <div className="mt-2 inline-flex items-start gap-2 rounded-tile border border-ink-600 bg-ink-800 px-3 py-2 text-xs text-mist-400">
+      <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mist-600" aria-hidden="true" />
       <span>
-        Last applied <span className="font-semibold text-slate-800">{when.toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
+        Last applied <span className="font-semibold text-paper">{when.toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
         {application.lastAppliedJobTitle ? ` for ${application.lastAppliedJobTitle}` : ""}
         {application.lastAppliedStatus ? (
           <>
@@ -142,7 +142,7 @@ export function LastAppliedNote({ application }) {
             <span
               className={cx(
                 "font-semibold",
-                application.lastAppliedStatus === "rejected" ? "text-rose-600" : "text-slate-800"
+                application.lastAppliedStatus === "rejected" ? "text-risk" : "text-paper"
               )}
             >
               {application.lastAppliedStatus.replace(/_/g, " ")}

@@ -1,1 +1,639 @@
 @import "tailwindcss";
+
+/* ==========================================================================
+   TalentPulse — "Instrument"
+
+   The product does one thing three times: it takes a measurement, then
+   corrects it. A CV gets a biased score, then a fair one. An employee has an
+   attrition risk, then a risk after intervention. A person has skills now,
+   and skills the role needs. Every screen in this app is a BEFORE and an
+   AFTER sitting next to each other.
+
+   So the interface is built like a measuring instrument rather than a
+   business dashboard:
+
+   · Chassis over cards. Panels are separated by hairlines on a dark
+     housing, not by white rectangles floating on grey with drop shadows.
+   · Two accents that MEAN something. `raw` (amber) is always the
+     uncorrected reading; `fair` (aqua) is always the corrected one. They
+     never appear decoratively, so colour alone teaches the model.
+   · Numbers are the content. Every figure is set in tabular monospace so
+     digits line up down a column and a changing value doesn't reflow.
+   · Motion is orientation, not ornament. Things enter from the direction
+     they came from, and nothing moves without saying where you are.
+
+   Typography: Archivo for display (tight, structural), IBM Plex Sans for
+   reading, IBM Plex Mono for every numeral in the product.
+   ========================================================================== */
+
+@theme {
+  /* ── Canvas & surfaces ────────────────────────────────────────────────
+     A cool near-white page with pure-white panels sitting on top of it.
+     The page is never white: if the canvas and the card are the same
+     colour, the card has to be drawn with a heavy border and the whole
+     screen goes flat. One step of separation is enough. */
+  --color-ink-950: #ffffff; /* on-accent text */
+  --color-ink-900: #f6f7f9; /* page canvas */
+  --color-ink-850: #f1f2f6; /* sunken: inputs, table headers, wells */
+  --color-ink-800: #ffffff; /* panel */
+  --color-ink-750: #f7f8fa; /* hover / raised */
+  --color-ink-700: #eef0f4; /* filled chip */
+  --color-ink-600: #e6e8ee; /* hairline border */
+  --color-ink-500: #d7dae3; /* stronger border */
+  --color-ink-400: #b9bfcc; /* strongest border */
+
+  /* ── Ink ramp ─────────────────────────────────────────────────────────
+     Five steps, each with a job: headings, body, secondary, muted, faint.
+     Everything down to `mist-500` clears 4.5:1 on white. */
+  --color-paper: #101319;
+  --color-mist-200: #3a4049;
+  --color-mist-400: #5f6672;
+  --color-mist-500: #7b8494;
+  --color-mist-700: #a4abb8;
+
+  /* ── The matched pair ─────────────────────────────────────────────────
+     `raw` is always the uncorrected reading, `fair` the corrected one.
+     Both are darkened from their display values so they stay legible as
+     text on white, not just as fills. */
+  --color-raw: #b45309;
+  --color-raw-dim: #fdf3e3;
+  --color-fair: #0e9384;
+  --color-fair-dim: #e6f6f4;
+
+  /* One accent, used with restraint — controls only, never data. */
+  --color-brand: #5b57d9;
+  --color-brand-hi: #4a46c8;
+  --color-brand-dim: #eeedfc;
+
+  --color-risk: #dc2743;
+  --color-risk-dim: #fdeaed;
+  --color-ok: #0a8f5f;
+  --color-ok-dim: #e6f6ef;
+
+  /* ── Type ─────────────────────────────────────────────────────────── */
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  /* ── Geometry ─────────────────────────────────────────────────────── */
+  --radius-panel: 14px;
+  --radius-tile: 10px;
+  --radius-chip: 6px;
+
+  /* ── Elevation ────────────────────────────────────────────────────────
+     Two stacked shadows, both nearly transparent: a tight one for the
+     contact edge and a wide soft one for the lift. A single blurry
+     `shadow-lg` is what makes a page look like a template. */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.05);
+  --shadow-lift: 0 2px 4px rgba(16, 24, 40, 0.04), 0 8px 20px -6px rgba(16, 24, 40, 0.1);
+  --shadow-pop: 0 4px 8px rgba(16, 24, 40, 0.05), 0 20px 40px -12px rgba(16, 24, 40, 0.16);
+
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-quick: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+html {
+  background: var(--color-ink-900);
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink-900);
+  color: var(--color-mist-200);
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis-weight: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  color: var(--color-paper);
+  letter-spacing: -0.022em;
+  font-weight: 700;
+  /* Stops a heading leaving one orphaned word on the last line. */
+  text-wrap: balance;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-brand) 18%, transparent);
+  color: var(--color-paper);
+}
+
+/* Keyboard focus is never removed, only restyled. It has to clear both the
+   dark chassis and the accent fills, hence the two-tone ring. */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+button,
+[role="button"],
+a,
+summary,
+label[for] {
+  cursor: pointer;
+  /* Kills the 300ms tap delay and the grey flash on touch devices. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* Thin scrollbars so panels keep their hairline geometry. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-500) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-500);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-400);
+  background-clip: content-box;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-mist-700);
+}
+
+/* Date/number spinners are chrome we don't want in a dark chassis. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ==========================================================================
+   Surfaces
+   ========================================================================== */
+
+/* The base unit of the layout. A panel is a hairline box on the chassis —
+   the 1px top highlight is what gives it a sense of being milled rather
+   than drawn, and replaces the drop shadow entirely. */
+/* A dialog scrolling to its end must not start scrolling the page behind it. */
+[role="dialog"] {
+  overscroll-behavior: contain;
+}
+
+.panel {
+  position: relative;
+  background: var(--color-ink-800);
+  border: 1px solid var(--color-ink-600);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-card);
+}
+.panel-flush {
+  box-shadow: none;
+}
+
+.panel-raised {
+  background: var(--color-ink-750);
+}
+.panel-sunken {
+  background: var(--color-ink-850);
+  box-shadow: none;
+}
+
+/* An interactive panel lifts by a hair and warms its border. No shadow. */
+.panel-hit {
+  transition:
+    border-color 180ms var(--ease-out-soft),
+    background-color 180ms var(--ease-out-soft),
+    transform 180ms var(--ease-out-soft);
+}
+.panel-hit {
+  transition:
+    border-color 180ms var(--ease-out-soft),
+    box-shadow 180ms var(--ease-out-soft),
+    transform 180ms var(--ease-out-soft);
+}
+.panel-hit:hover {
+  border-color: var(--color-ink-500);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-1px);
+}
+.panel-hit:active {
+  transform: translateY(1px);
+}
+
+.hairline {
+  border-color: var(--color-ink-600);
+}
+
+/* ==========================================================================
+   Atmosphere
+
+   Two effects, both extremely quiet. The grain stops large dark fields from
+   banding on cheap panels; the aurora gives the top of a page somewhere to
+   come from. Neither is decoration you'd notice on its own.
+   ========================================================================== */
+
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  width: 46rem;
+  height: 46rem;
+  border-radius: 50%;
+  filter: blur(120px);
+}
+.aurora::before {
+  top: -26rem;
+  left: -16rem;
+  background: color-mix(in oklab, var(--color-brand) 11%, transparent);
+}
+.aurora::after {
+  top: -30rem;
+  right: -18rem;
+  background: color-mix(in oklab, var(--color-fair) 8%, transparent);
+}
+
+/* A hairline grid, used behind hero areas only. */
+.gridlines {
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--color-paper) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--color-paper) 5%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
+}
+
+/* ==========================================================================
+   Type helpers
+   ========================================================================== */
+
+/* Every number in the product. Tabular figures mean a value can tick from
+   9% to 88% without the row jumping sideways. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  letter-spacing: -0.01em;
+}
+
+/* Section markers. Small, wide, quiet — they label, they don't shout. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-mist-500);
+}
+
+/* Page and section titles. Archivo tightens hard at large sizes, which is
+   what gives a heading presence without turning up the weight. */
+.title-lg {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--color-paper);
+}
+.title-md {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-paper);
+}
+
+.display {
+  font-family: var(--font-display);
+  letter-spacing: -0.032em;
+  line-height: 1.02;
+  font-weight: 700;
+  /* No colour here on purpose: this class is used on dark feature panels as
+     well as on the light chassis, and a colour would outrank the utility the
+     caller sets. */
+}
+
+/* A tighter, larger scale for page headlines. */
+.display-xl {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+/* ==========================================================================
+   Motion
+
+   Entrances are staged so a page reads top-down as it arrives. `--i` is the
+   row index; anything in a list can opt in with style={{ "--i": n }}.
+   ========================================================================== */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.enter {
+  animation: rise 520ms var(--ease-out-soft) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+.enter-fade {
+  animation: fade 400ms var(--ease-out-soft) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+/* Bars and meters grow from their origin rather than appearing full-length. */
+.sweep {
+  transform-origin: left center;
+  animation: sweep 760ms var(--ease-out-soft) both;
+  animation-delay: calc(var(--i, 0) * 55ms + 120ms);
+}
+
+/* Anyone who has asked their OS for less motion gets none of it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Clerk — the hosted auth widget, dressed to match the chassis
+   ========================================================================== */
+
+.cl-internal-b3fm6y,
+.cl-footer {
+  display: none;
+}
+
+
+/* ==========================================================================
+   Feature panels
+
+   The chassis is light. Emphasis comes from a small number of deep panels
+   that invert it — a hero readout, the conclusion of a report — the way
+   Linear and Fuselab drop a dark band into a white page to mark the moment
+   that matters. Used more than once or twice per screen the effect dies, so
+   there is exactly one per page.
+   ========================================================================== */
+
+.feature {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  border: 1px solid #1e212b;
+  background:
+    radial-gradient(90rem 40rem at 12% -30%, rgba(124, 111, 255, 0.22), transparent 60%),
+    radial-gradient(70rem 34rem at 92% -10%, rgba(45, 212, 191, 0.14), transparent 55%),
+    linear-gradient(168deg, #171a24 0%, #0f1116 52%, #0c0e13 100%);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+    0 20px 48px -20px rgba(12, 14, 19, 0.55);
+  color: #f4f6fa;
+}
+
+/* A hairline grid inside the panel, fading out downward. Gives the dark
+   field structure so it reads as an instrument face, not a black rectangle. */
+.feature::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: radial-gradient(ellipse 90% 70% at 30% 0%, #000 10%, transparent 72%);
+}
+
+.feature-dim {
+  color: rgba(244, 246, 250, 0.62);
+}
+.feature-faint {
+  color: rgba(244, 246, 250, 0.42);
+}
+.feature-well {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-tile);
+}
+
+/* ==========================================================================
+   Data tables
+
+   One treatment for every table in the product. Sticky tinted header, no
+   zebra striping (it fights the hover state and adds noise at this density),
+   hairline row rules, and a full-row hover so the eye can track across a
+   wide row without losing the line.
+   ========================================================================== */
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-ink-850);
+  border-bottom: 1px solid var(--color-ink-600);
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--color-mist-500);
+  white-space: nowrap;
+  text-align: left;
+}
+.data-table thead th:first-child {
+  border-top-left-radius: var(--radius-tile);
+}
+.data-table thead th:last-child {
+  border-top-right-radius: var(--radius-tile);
+}
+
+.data-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-ink-600);
+  color: var(--color-mist-200);
+  vertical-align: middle;
+}
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.data-table tbody tr {
+  transition: background-color 140ms var(--ease-out-soft);
+}
+.data-table tbody tr:hover {
+  background: var(--color-ink-750);
+}
+
+/* Numbers in a table are always mono and right-aligned by default. */
+.data-table td.num,
+.data-table th.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table tfoot td {
+  border-top: 1px solid var(--color-ink-600);
+  background: color-mix(in oklab, var(--color-ink-850) 60%, transparent);
+  padding: 0;
+}
+
+/* The same table inverted, for use inside a feature panel. */
+.feature .data-table thead th {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  color: rgba(244, 246, 250, 0.45);
+}
+.feature .data-table tbody td {
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+  color: rgba(244, 246, 250, 0.82);
+}
+.feature .data-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+
+/* ==========================================================================
+   Editorial typesetting
+
+   The writing pattern the whole product follows, borrowed from how design
+   studios set a case study: a numbered eyebrow, a short declarative
+   statement, then a lede at a readable measure. Labels tell you the topic;
+   statements tell you the finding, so the headings are always statements.
+   ========================================================================== */
+
+/* Prose never runs the full width of a dashboard, however good the type is. */
+.measure {
+  max-width: 62ch;
+}
+.measure-tight {
+  max-width: 48ch;
+}
+
+/* A lede sits between a heading and body copy: slightly larger, looser, and
+   a step lighter in colour so it reads as introduction rather than content. */
+.lede {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--color-mist-400);
+  max-width: 58ch;
+}
+
+/* Opening sentence of a section gets a marker in the margin rather than a
+   bold run, which would fight the heading above it. */
+.note {
+  position: relative;
+  padding-left: 14px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--color-mist-400);
+}
+.note::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  bottom: 0.45em;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-ink-500);
+}
+
+/* Section rhythm. Related blocks sit close, unrelated ones get real air —
+   spacing is the only thing separating them once the boxes are gone. */
+.stack-page > * + * {
+  margin-top: 28px;
+}
+.stack-section > * + * {
+  margin-top: 16px;
+}
+
+/* Figures quoted inside a sentence stay mono so they line up with the tables
+   they refer to. */
+.fig {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.94em;
+  color: var(--color-paper);
+}

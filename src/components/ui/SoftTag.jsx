@@ -1,8 +1,14 @@
 import React from "react";
+import { cx } from "../../lib/cx.js";
 
-function SoftTag({ children }) {
+function SoftTag({ children, className = "" }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700">
+    <span
+      className={cx(
+        "inline-flex items-center rounded-chip border border-ink-600 bg-ink-850 px-2 py-0.5 text-[11px] text-mist-200",
+        className
+      )}
+    >
       {children}
     </span>
   );
