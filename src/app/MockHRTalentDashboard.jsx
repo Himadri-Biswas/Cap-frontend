@@ -32,7 +32,7 @@ export default function MockHRTalentDashboard() {
   // Deep-link target set by a notification click (e.g. open employee #123).
   const [focus, setFocus] = useState({ view: null, id: null });
 
-  // The "+ New" button on Job Recruitment opens this.
+  // The "New job posting" panel inside the Job Recruitment view opens this.
   const [showNewJob, setShowNewJob] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -115,8 +115,9 @@ export default function MockHRTalentDashboard() {
               setSearch={setSearch}
               placeholder={heading.ph}
               showSearch={active !== "dashboard"}
-              showNew={active === "recruitment"}
-              onNew={() => setShowNewJob(true)}
+              // Posting a job now lives inside the Job Recruitment screen,
+              // directly above "Latest Job Posts", instead of in this header.
+              showNew={false}
               onNavigate={handleNavigate}
             />
 
@@ -170,6 +171,7 @@ export default function MockHRTalentDashboard() {
                     setSearch={setSearch}
                     focusJobId={focus.view === "recruitment" ? focus.id : null}
                     onJobsChanged={loadData}
+                    onNewJob={() => setShowNewJob(true)}
                   />
                 )}
                 {active === "upskilling" && (

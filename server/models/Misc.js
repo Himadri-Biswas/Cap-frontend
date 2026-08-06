@@ -40,6 +40,20 @@ const cvFileSchema = new mongoose.Schema(
     extractedTextChars: { type: Number, default: 0 },
     textExtractionStatus: { type: String, enum: ["pending", "done", "failed"], default: "pending" },
 
+    /**
+     * A `profile_cv` is a document the applicant keeps in their own library,
+     * uploaded once at sign-up and reused on every application. The skills are
+     * extracted at UPLOAD time and cached here, so applying later is a pick
+     * from a list rather than another round trip to the ML Space.
+     */
+    label: String, // "Data CV", "Backend CV" — the applicant's own name for it
+    skills: { type: [String], default: [] },
+    skillCount: { type: Number, default: 0 },
+    extraction: { type: mongoose.Schema.Types.Mixed, default: null },
+    extractionStatus: { type: String, enum: ["pending", "done", "failed"], default: "pending" },
+    extractionError: String,
+    extractedAt: Date,
+
     downloadCount: { type: Number, default: 0 },
     lastDownloadedAt: Date,
     deleted: { type: Boolean, default: false, index: true },

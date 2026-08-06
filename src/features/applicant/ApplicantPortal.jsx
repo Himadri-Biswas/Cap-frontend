@@ -9,7 +9,7 @@
  *      Module 1's `/read-file` + `/extract-skills`, so the applicant sees the
  *      skills the system actually parsed out of their document.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -23,12 +23,14 @@ import {
   MapPin,
   Search,
   Sparkles,
-  Upload,
+  Star,
+  UserRound,
   XCircle,
 } from "lucide-react";
 import Modal from "../../components/ui/Modal.jsx";
 import Pill from "../../components/ui/Pill.jsx";
 import CvViewer from "../../components/CvViewer.jsx";
+import CvLibrary, { formatFileSize } from "./CvLibrary.jsx";
 import UserMenu from "../layout/UserMenu.jsx";
 import NotificationBell from "../notifications/NotificationBell.jsx";
 import { cx } from "../../lib/cx.js";
@@ -46,12 +48,6 @@ const STATUS_STYLE = {
   withdrawn: { cls: "border-slate-200 bg-slate-100 text-slate-500", label: "Withdrawn" },
 };
 
-function formatFileSize(bytes) {
-  if (!bytes) return "0 KB";
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
-
 function deadlinePassed(deadline) {
   const [y, m, d] = String(deadline).split("-").map(Number);
   if (!y || !m || !d) return false;
@@ -67,11 +63,12 @@ function countdown(nextEligibleAt) {
 }
 
 export default function ApplicantPortal() {
-  const { user } = useSession();
+  const { user, cvs: sessionCvs, refresh } = useSession();
 
   const [tab, setTab] = useState("jobs");
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [cvs, setCvs] = useState(sessionCvs || []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
@@ -79,13 +76,23 @@ export default function ApplicantPortal() {
   const [applyJob, setApplyJob] = useState(null);
   const [detail, setDetail] = useState(null);
 
+  // Keep the library in step with whatever the session last reported.
+  useEffect(() => {
+    setCvs(sessionCvs || []);
+  }, [sessionCvs]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [jobsResult, mine] = await Promise.all([api.jobs.list(), api.applications.mine()]);
+      const [jobsResult, mine, myCvs] = await Promise.all([
+        api.jobs.list(),
+        api.applications.mine(),
+        api.myCvs.list().catch(() => ({ cvs: [] })),
+      ]);
       setJobs(jobsResult.jobs || []);
       setApplications(mine.applications || []);
+      setCvs(myCvs.cvs || []);
     } catch (err) {
       setError(err.message || "Could not load your portal.");
     } finally {
@@ -156,6 +163,7 @@ export default function ApplicantPortal() {
             {[
               { key: "jobs", label: "Open roles", count: jobs.filter((j) => !deadlinePassed(j.deadline)).length },
               { key: "applications", label: "My applications", count: applications.length },
+              { key: "profile", label: "My profile", count: cvs.length },
             ].map((t) => (
               <button
                 key={t.key}
@@ -212,7 +220,7 @@ export default function ApplicantPortal() {
               <EmptyState
                 icon={Briefcase}
                 title="No open roles right now"
-                body="Check back soon — new positions are posted regularly."
+                body="No positions are open at the moment."
               />
             ) : (
               filteredJobs.map((job) => (
@@ -220,13 +228,13 @@ export default function ApplicantPortal() {
               ))
             )}
           </div>
-        ) : (
+        ) : tab === "applications" ? (
           <div className="mt-4 space-y-3">
             {applications.length === 0 ? (
               <EmptyState
                 icon={FileText}
                 title="You haven't applied to anything yet"
-                body="Browse the open roles and submit your CV — it takes under a minute."
+                body="Open roles are listed under the first tab."
               />
             ) : (
               applications.map((application) => (
@@ -238,6 +246,8 @@ export default function ApplicantPortal() {
               ))
             )}
           </div>
+        ) : (
+          <ProfileTab user={user} cvs={cvs} onCvsChange={setCvs} onSaved={refresh} />
         )}
       </div>
 
@@ -250,6 +260,12 @@ export default function ApplicantPortal() {
           await load();
         }}
         user={user}
+        cvs={cvs}
+        onCvsChange={setCvs}
+        onEditProfile={() => {
+          setApplyJob(null);
+          setTab("profile");
+        }}
       />
 
       <Modal
@@ -340,7 +356,10 @@ function EmptyState({ icon: Icon, title, body }) {
 }
 
 function JobCard({ job, onApply }) {
-  const closed = deadlinePassed(job.deadline);
+  // Closed either because the deadline passed, or because an admin stopped the
+  // posting. The server refuses both, so the button must not offer either.
+  const stopped = !!job.status && job.status !== "open";
+  const closed = stopped || deadlinePassed(job.deadline);
   const applied = job.myApplication;
   const waiting = applied?.nextEligibleAt ? countdown(applied.nextEligibleAt) : null;
 
@@ -364,7 +383,7 @@ function JobCard({ job, onApply }) {
               )}
             >
               {closed ? <XCircle className="mr-1 h-3.5 w-3.5" /> : <CheckCircle2 className="mr-1 h-3.5 w-3.5" />}
-              {closed ? "Closed" : "Open"}
+              {stopped ? "No longer accepting" : closed ? "Closed" : "Open"}
             </Pill>
           </div>
 
@@ -406,6 +425,7 @@ function JobCard({ job, onApply }) {
           {closed ? (
             <button
               disabled
+              title={stopped ? "The employer stopped accepting applications for this role." : "The deadline has passed."}
               className="cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-400"
             >
               Closed
@@ -484,45 +504,172 @@ function ApplicationCard({ application, onOpen }) {
   );
 }
 
-/** The apply form: profile fields + CV upload, gated by the server's cooldown. */
-function ApplyModal({ job, onClose, onSubmitted, user }) {
+/**
+ * My profile — the same details collected at sign-up, editable later.
+ *
+ * Nothing here is asked for again at apply time; the application copies these
+ * values off the user document on the server.
+ */
+function ProfileTab({ user, cvs, onCvsChange, onSaved }) {
+  const [form, setForm] = useState({
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    phone: user?.phone || "",
+    location: user?.location || "",
+    headline: user?.headline || "",
+    yearsExperience: user?.yearsExperience ?? "",
+    linkedinUrl: user?.linkedinUrl || "",
+    portfolioUrl: user?.portfolioUrl || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
+
+  const set = (key) => (value) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setSaved(false);
+  };
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.updateMe({
+        ...form,
+        yearsExperience: form.yearsExperience === "" ? null : Number(form.yearsExperience),
+      });
+      await onSaved?.();
+      setSaved(true);
+    } catch (err) {
+      setError(err.message || "Could not save your details.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
+            <UserRound className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-slate-900">Your details</div>
+            <div className="text-xs text-slate-500">Sent with every application.</div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <Field label="First name" value={form.firstName} onChange={set("firstName")} />
+          <Field label="Last name" value={form.lastName} onChange={set("lastName")} />
+          <Field label="Phone" value={form.phone} onChange={set("phone")} />
+          <Field label="Location" value={form.location} onChange={set("location")} />
+          <Field label="Current title" value={form.headline} onChange={set("headline")} />
+          <Field
+            label="Years of experience"
+            type="number"
+            value={form.yearsExperience}
+            onChange={set("yearsExperience")}
+          />
+          <Field label="LinkedIn" value={form.linkedinUrl} onChange={set("linkedinUrl")} />
+          <Field label="Portfolio / GitHub" value={form.portfolioUrl} onChange={set("portfolioUrl")} />
+        </div>
+
+        {error && (
+          <div className="mt-4 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+            <div className="text-sm text-rose-700">{error}</div>
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Save changes
+          </button>
+          {saved && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+              <CheckCircle2 className="h-4 w-4" />
+              Saved
+            </span>
+          )}
+          <span className="ml-auto text-xs text-slate-400">{user?.email}</span>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
+            <FileText className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-slate-900">Your CVs</div>
+            <div className="text-xs text-slate-500">
+              Choose which one to send when you apply.
+            </div>
+          </div>
+        </div>
+        <div className="mt-5">
+          <CvLibrary cvs={cvs} onChange={onCvsChange} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The apply form.
+ *
+ * All it asks for now is which stored CV to send and an optional cover letter.
+ * Name, phone, title and the rest were captured at sign-up and are copied off
+ * the user document by the server, so they are shown here read-only rather
+ * than typed again. Anyone who arrives without a CV can still add one inline.
+ */
+function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, onEditProfile }) {
   const [eligibility, setEligibility] = useState(null);
   const [checking, setChecking] = useState(false);
-  const [file, setFile] = useState(null);
-  const [form, setForm] = useState({});
+  const [selectedCvId, setSelectedCvId] = useState(null);
+  const [coverLetter, setCoverLetter] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
-  const inputRef = useRef(null);
 
   useEffect(() => {
     if (!job) {
       setEligibility(null);
-      setFile(null);
       setError(null);
       setResult(null);
+      setCoverLetter("");
       return;
     }
-    setForm({
-      applicantName: user?.fullName || "",
-      phone: user?.phone || "",
-      location: user?.location || "",
-      currentTitle: user?.headline || "",
-      yearsExperience: user?.yearsExperience ?? "",
-      linkedinUrl: user?.linkedinUrl || "",
-      coverLetter: "",
-    });
+    // Default to the CV marked default, else the most recent one.
+    setSelectedCvId(cvs.find((c) => c.isDefault)?.fileId || cvs[0]?.fileId || null);
     setChecking(true);
     api.jobs
       .eligibility(job.id)
       .then(setEligibility)
       .catch(() => setEligibility(null))
       .finally(() => setChecking(false));
-  }, [job, user]);
+  }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A CV added from inside this modal becomes the selected one.
+  function handleCvsChange(next) {
+    onCvsChange?.(next);
+    const known = new Set(cvs.map((c) => c.fileId));
+    const added = next.find((c) => !known.has(c.fileId));
+    if (added) setSelectedCvId(added.fileId);
+    else if (!next.some((c) => c.fileId === selectedCvId)) setSelectedCvId(next[0]?.fileId || null);
+  }
 
   async function submit() {
-    if (!file) {
-      setError("Please attach your CV.");
+    if (!selectedCvId) {
+      setError("Choose which CV to send.");
       return;
     }
     setSubmitting(true);
@@ -530,10 +677,8 @@ function ApplyModal({ job, onClose, onSubmitted, user }) {
     try {
       const formData = new FormData();
       formData.append("jobId", job.id);
-      formData.append("cv", file);
-      for (const [key, value] of Object.entries(form)) {
-        if (value !== "" && value != null) formData.append(key, value);
-      }
+      formData.append("cvFileId", selectedCvId);
+      if (coverLetter.trim()) formData.append("coverLetter", coverLetter.trim());
       const data = await api.applications.submit(formData);
       setResult(data);
     } catch (err) {
@@ -576,13 +721,13 @@ function ApplyModal({ job, onClose, onSubmitted, user }) {
             </button>
             <button
               onClick={submit}
-              disabled={submitting || blocked || checking || !file}
+              disabled={submitting || blocked || checking || !selectedCvId}
               className="flex-1 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Uploading & extracting skills…
+                  Submitting…
                 </span>
               ) : (
                 "Submit application"
@@ -671,77 +816,112 @@ function ApplyModal({ job, onClose, onSubmitted, user }) {
             </div>
           )}
 
-          {/* CV upload */}
+          {/* Pick a stored CV */}
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Your CV *</div>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".pdf,.docx,.doc,.txt,.rtf,.odt,.md"
-              className="hidden"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] || null);
-                setError(null);
-              }}
-            />
-            {file ? (
-              <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm">
-                    <FileText className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-900">{file.name}</div>
-                    <div className="text-xs text-slate-500">{formatFileSize(file.size)}</div>
-                  </div>
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Which CV to send *</div>
+              {cvs.length > 0 && <div className="text-[11px] text-slate-400">{cvs.length} saved</div>}
+            </div>
+
+            {cvs.length === 0 ? (
+              <div className="mt-2 space-y-3">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  No CVs saved yet. Anything you add here is kept in your profile.
                 </div>
-                <button
-                  onClick={() => {
-                    setFile(null);
-                    if (inputRef.current) inputRef.current.value = "";
-                  }}
-                  className="shrink-0 text-xs font-semibold text-rose-600 hover:text-rose-700"
-                >
-                  Remove
-                </button>
+                <CvLibrary cvs={cvs} onChange={handleCvsChange} compact />
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                disabled={blocked}
-                className="mt-2 flex w-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 transition hover:border-indigo-300 hover:bg-indigo-50/40 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
-                  <Upload className="h-5 w-5" />
+              <div className="mt-2 space-y-2">
+                {cvs.map((cv) => {
+                  const active = cv.fileId === selectedCvId;
+                  return (
+                    <button
+                      key={cv.fileId}
+                      type="button"
+                      disabled={blocked}
+                      onClick={() => {
+                        setSelectedCvId(cv.fileId);
+                        setError(null);
+                      }}
+                      className={cx(
+                        "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition disabled:opacity-50",
+                        active
+                          ? "border-indigo-300 bg-indigo-50/70 ring-2 ring-indigo-200"
+                          : "border-slate-200 bg-white hover:bg-slate-50"
+                      )}
+                    >
+                      <div
+                        className={cx(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                          active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
+                        )}
+                      >
+                        {active ? <CheckCircle2 className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="truncate text-sm font-semibold text-slate-900">{cv.originalName}</span>
+                          {cv.isDefault && (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-indigo-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                              <Star className="h-2.5 w-2.5 fill-current" />
+                              Default
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-slate-500">
+                          {formatFileSize(cv.sizeBytes)}
+                          {cv.extractionStatus === "done" ? ` · ${cv.skillCount} skills already read` : " · skills not read yet"}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                <div className="pt-1">
+                  <CvLibrary cvs={cvs} onChange={handleCvsChange} uploadOnly />
                 </div>
-                <div className="mt-3 text-sm font-semibold text-slate-900">Upload your CV</div>
-                <div className="mt-1 text-xs text-slate-500">PDF, DOCX, DOC, TXT, RTF or ODT · up to 15 MB</div>
-              </button>
+              </div>
             )}
           </div>
 
-          {/* Profile fields */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Full name" value={form.applicantName} onChange={(v) => setForm((f) => ({ ...f, applicantName: v }))} />
-            <Field label="Phone" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
-            <Field label="Current title" value={form.currentTitle} onChange={(v) => setForm((f) => ({ ...f, currentTitle: v }))} />
-            <Field label="Location" value={form.location} onChange={(v) => setForm((f) => ({ ...f, location: v }))} />
-            <Field
-              label="Years of experience"
-              type="number"
-              value={form.yearsExperience}
-              onChange={(v) => setForm((f) => ({ ...f, yearsExperience: v }))}
-            />
-            <Field label="LinkedIn" value={form.linkedinUrl} onChange={(v) => setForm((f) => ({ ...f, linkedinUrl: v }))} />
+          {/* Everything else came from the profile — shown, not re-asked */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Applying as</div>
+                <div className="mt-1 truncate text-sm font-semibold text-slate-900">
+                  {user?.fullName || user?.email}
+                </div>
+                <div className="mt-0.5 text-[11px] leading-5 text-slate-500">
+                  {[
+                    user?.email,
+                    user?.phone,
+                    user?.headline,
+                    user?.location,
+                    user?.yearsExperience != null ? `${user.yearsExperience} yrs experience` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onEditProfile}
+                className="shrink-0 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+              >
+                Edit
+              </button>
+            </div>
           </div>
 
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Cover letter</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Cover letter <span className="normal-case text-slate-400">(optional, specific to this role)</span>
+            </div>
             <textarea
               rows={4}
-              value={form.coverLetter}
-              onChange={(e) => setForm((f) => ({ ...f, coverLetter: e.target.value }))}
+              value={coverLetter}
+              onChange={(e) => setCoverLetter(e.target.value)}
               placeholder="Why are you a good fit for this role?"
               className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-300"
             />

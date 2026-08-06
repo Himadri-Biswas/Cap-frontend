@@ -156,7 +156,23 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
   // Live-intervention state (module 3 "LIVE attrition")
   const [applying, setApplying]     = useState(null);  // feature currently being applied
   const [applyError, setApplyError] = useState(null);
+  const [applyNotice, setApplyNotice] = useState(null); // "nothing to do", not a failure
   const [lastApplied, setLastApplied] = useState(null);
+
+  /**
+   * Reloading the parent's `employees` array mid-view throws you out of the
+   * panel: the grid re-filters, and an employee whose tier just dropped from
+   * Critical to Low no longer matches an active risk filter, so the detail view
+   * deselects itself. Applying a change is exactly when the tier moves, which
+   * made it happen every single time.
+   *
+   * So the parent reload is deferred to the Back button. While you stay and
+   * read the result, the panel keeps itself honest with `appliedValues` — the
+   * feature values just written, laid over the (now slightly stale) employee
+   * record so the profile rows and the plan buttons still read correctly.
+   */
+  const [appliedValues, setAppliedValues] = useState({});
+  const refreshPending = useRef(false);
   const [history, setHistory]       = useState([]);
   const [reverting, setReverting]   = useState(false);
 
@@ -184,15 +200,33 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
     });
   }, [employees, search, dept, mode, riskFilter]);
 
-  // Deselect if filtered out
+  /**
+   * Close the detail panel only when the employee genuinely leaves the dataset
+   * (offboarded, or a reload no longer returns them) — not when they stop
+   * matching a filter. This used to key off the FILTERED list, so applying an
+   * intervention that moved someone from Critical to Low, with a risk filter
+   * set, deselected them the instant the list reloaded.
+   */
   useEffect(() => {
-    if (selectedId && !filtered.find((x) => x.id === selectedId)) {
+    if (selectedId && employees.length && !employees.find((x) => x.id === selectedId)) {
       setSelectedId(null);
       setAnalysis(null);
     }
-  }, [filtered, selectedId]);
+  }, [employees, selectedId]);
 
-  const selectedEmployee = filtered.find((x) => x.id === selectedId) || null;
+  const selectedEmployeeRow = employees.find((x) => x.id === selectedId) || null;
+  /** The employee as it now stands, including changes not yet reloaded. */
+  const selectedEmployee = selectedEmployeeRow
+    ? { ...selectedEmployeeRow, ...appliedValues }
+    : null;
+
+  /** Runs the deferred parent reload, once, when leaving the detail panel. */
+  function flushPendingRefresh() {
+    if (!refreshPending.current) return;
+    refreshPending.current = false;
+    setAppliedValues({});
+    onEmployeesChanged?.();
+  }
 
   // A notification deep-link ("open employee #123") lands here.
   const focusHandled = useRef(null);
@@ -217,13 +251,19 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
    * `/infer` call below — same URL, same payload as before — and writes the
    * fresh result back into the cache.
    */
-  async function handleSelectEmployee(e, { live = false } = {}) {
+  async function handleSelectEmployee(e, { live = false, keepApplied = false } = {}) {
     setSelectedId(e.id);
     setAnalysis(null);
     setError(null);
     setApplyError(null);
-    setLastApplied(null);
+    setApplyNotice(null);
     setLoading(true);
+    // "Re-run model" stays on the same person, so the values written a moment
+    // ago must survive it. Opening someone else starts clean.
+    if (!keepApplied) {
+      setLastApplied(null);
+      setAppliedValues({});
+    }
 
     api.employees
       .events(e.EmployeeNumber)
@@ -311,45 +351,117 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
    * standard `/infer`-shaped payload, which drops straight back into
    * `analysis` — so every panel below re-renders from freshly stored numbers.
    */
-  async function handleApplyIntervention(change, plan) {
-    if (!selectedEmployee) return;
-    const feature = change.feature_changed;
-    setApplying(feature);
+  /**
+   * Runs an apply call and then re-reads everything it touched.
+   *
+   * Writing the change is only half the job: the panel also has to SHOW it.
+   * The apply response already carries the analysis straight out of MongoDB,
+   * but the employee record behind the left-hand profile (job satisfaction,
+   * distance from home, income) lives in the parent's `employees` array, and
+   * the DiCE plans decide what is still offerable from it. Reloading both here
+   * is what makes the effect visible immediately instead of after a refresh.
+   */
+  async function runApply(employeeNumber, call, busyKey) {
+    setApplying(busyKey);
     setApplyError(null);
+    setApplyNotice(null);
     try {
-      const result = await api.attrition.apply(selectedEmployee.EmployeeNumber, {
-        feature,
-        value: coerceSuggested(change),
-        cfIndex: plan?.cf_index ?? null,
-        interventionLabel: change.intervention_label,
-      });
+      const result = await call();
       setAnalysis(result);
+      // `_noop` means the value was already in place, so there was nothing to
+      // write. Say that plainly instead of raising an error.
+      setApplyNotice(result._noop?.message || null);
       setLastApplied(result._applied || null);
-      api.employees
-        .events(selectedEmployee.EmployeeNumber)
+
+      // Carry the written values locally so this panel reads correctly while
+      // you stay on it. The employee grid behind it reloads on Back, which is
+      // what stops the view closing under you mid-read.
+      const written = result._applied?.changes || [];
+      if (written.length) {
+        setAppliedValues((current) => ({
+          ...current,
+          ...Object.fromEntries(written.map((c) => [c.feature, c.to_value])),
+        }));
+        refreshPending.current = true;
+      }
+
+      // The change history belongs to this panel, so it refreshes right away.
+      await api.employees
+        .events(employeeNumber)
         .then((data) => setHistory(data.events || []))
         .catch(() => {});
-      onEmployeesChanged?.();
+      return result;
     } catch (err) {
-      setApplyError(err.message || "Could not apply this intervention.");
+      setApplyError(err.message || "Could not apply this change.");
+      return null;
     } finally {
       setApplying(null);
     }
+  }
+
+  /** One action out of a plan. */
+  async function handleApplyIntervention(change, plan) {
+    if (!selectedEmployee) return;
+    await runApply(
+      selectedEmployee.EmployeeNumber,
+      () =>
+        api.attrition.apply(selectedEmployee.EmployeeNumber, {
+          feature: change.feature_changed,
+          value: coerceSuggested(change),
+          cfIndex: plan?.cf_index ?? null,
+          interventionLabel: change.intervention_label,
+        }),
+      change.feature_changed
+    );
+  }
+
+  /**
+   * Every action in a plan, together.
+   *
+   * This is not a loop over the single-apply call. The server writes all the
+   * changes and re-runs the model once, which is the only way the result
+   * matches the "predicted risk after" the plan advertises.
+   */
+  async function handleApplyPlan(plan) {
+    if (!selectedEmployee || !plan?.changes?.length) return;
+    await runApply(
+      selectedEmployee.EmployeeNumber,
+      () =>
+        api.attrition.applyPlan(selectedEmployee.EmployeeNumber, {
+          changes: plan.changes.map((c) => ({
+            feature: c.feature_changed,
+            value: coerceSuggested(c),
+          })),
+          cfIndex: plan.cf_index ?? null,
+          planLabel: plan.changes.map((c) => c.intervention_label).filter(Boolean).join(" · "),
+        }),
+      `plan:${plan.cf_index}`
+    );
   }
 
   async function handleRevert() {
     if (!selectedEmployee) return;
     setReverting(true);
     setApplyError(null);
+    setApplyNotice(null);
     try {
       const result = await api.attrition.revert(selectedEmployee.EmployeeNumber);
       setAnalysis(result);
       setLastApplied(result._applied || null);
-      api.employees
+
+      const written = result._applied?.changes || [];
+      if (written.length) {
+        setAppliedValues((current) => ({
+          ...current,
+          ...Object.fromEntries(written.map((c) => [c.feature, c.to_value])),
+        }));
+        refreshPending.current = true;
+      }
+
+      await api.employees
         .events(selectedEmployee.EmployeeNumber)
         .then((data) => setHistory(data.events || []))
         .catch(() => {});
-      onEmployeesChanged?.();
     } catch (err) {
       setApplyError(err.message || "Could not revert.");
     } finally {
@@ -463,7 +575,16 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <button
-            onClick={() => { setSelectedId(null); setAnalysis(null); setError(null); setLastApplied(null); }}
+            onClick={() => {
+              // Leaving is the moment the grid behind this panel catches up.
+              flushPendingRefresh();
+              setSelectedId(null);
+              setAnalysis(null);
+              setError(null);
+              setLastApplied(null);
+              setApplyError(null);
+              setApplyNotice(null);
+            }}
             className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
             <ArrowRight className="h-4 w-4 rotate-180" /> Back
@@ -487,7 +608,7 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
               </button>
             )}
             <button
-              onClick={() => handleSelectEmployee(emp, { live: true })}
+              onClick={() => handleSelectEmployee(emp, { live: true, keepApplied: true })}
               disabled={loading}
               className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
             >
@@ -558,8 +679,23 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
                     return (
                       <div key={event._id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                         <div className="flex items-start justify-between gap-2">
+                          {/* A plan applied in one step moved several features,
+                              so list them all rather than only the first. */}
                           <div className="text-xs font-semibold text-slate-800">
-                            {event.feature_label}: {String(event.from_value)} → {String(event.to_value)}
+                            {event.changes?.length > 1 ? (
+                              <>
+                                <div className="text-slate-500">{event.changes.length} changes together</div>
+                                {event.changes.map((c, i) => (
+                                  <div key={i}>
+                                    {c.feature_label}: {String(c.from_value)} → {String(c.to_value)}
+                                  </div>
+                                ))}
+                              </>
+                            ) : (
+                              <>
+                                {event.feature_label}: {String(event.from_value)} → {String(event.to_value)}
+                              </>
+                            )}
                           </div>
                           {event.delta != null && (
                             <div
@@ -654,10 +790,18 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
                         <Zap className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-bold text-emerald-800">Applied and saved to MongoDB</div>
-                        <div className="mt-0.5 text-xs text-emerald-700">
-                          {lastApplied.feature_label}: {String(lastApplied.from_value)} →{" "}
-                          {String(lastApplied.to_value)}
+                        <div className="text-sm font-bold text-emerald-800">
+                          {lastApplied.changes?.length > 1 ? `${lastApplied.changes.length} changes applied` : "Applied"}
+                        </div>
+                        <div className="mt-0.5 space-y-0.5 text-xs text-emerald-700">
+                          {(lastApplied.changes?.length
+                            ? lastApplied.changes
+                            : [lastApplied]
+                          ).map((c, i) => (
+                            <div key={i}>
+                              {c.feature_label}: {String(c.from_value)} → {String(c.to_value)}
+                            </div>
+                          ))}
                         </div>
                         <div className="mt-1 text-xs font-semibold text-slate-700">
                           {(lastApplied.prob_before * 100).toFixed(1)}% →{" "}
@@ -671,6 +815,16 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
                           )}
                         </div>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {applyNotice && (
+                  <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <div className="text-sm text-amber-800">
+                      <span className="font-semibold">Nothing to change. </span>
+                      {applyNotice}
                     </div>
                   </div>
                 )}
@@ -777,13 +931,23 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
                   <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="text-base font-bold text-slate-900">Intervention Plans</div>
                     <div className="text-xs text-slate-500 mt-1 mb-4">
-                      Counterfactual scenarios — what HR can do to reduce this employee's attrition risk.
-                      <span className="font-medium text-slate-600"> Apply writes the change to MongoDB and re-runs the model.</span>
+                      Counterfactual scenarios. Each predicted risk is scored by the model on that exact change,
+                      so applying a plan lands on the figure shown.
                     </div>
                     <div className="space-y-3">
                       {plans.map((plan, idx) => {
                         const planName = planNames[idx] || `Plan ${plan.cf_index}`;
                         const tagColor = planTagColors[idx] || planTagColors[0];
+                        // A plan is fully done when nothing in it is still
+                        // offerable — either already applied, or the employee
+                        // already sits at the suggested value.
+                        const outstanding = plan.changes.filter((chg) => {
+                          const live = emp[chg.feature_changed];
+                          const atTarget =
+                            live !== undefined && live !== null && String(live) === String(chg.suggested_value);
+                          return !chg.applied && !atTarget;
+                        });
+                        const planBusy = applying === `plan:${plan.cf_index}`;
                         return (
                           <div key={plan.cf_index} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <div className="flex items-start justify-between gap-3 mb-3">
@@ -805,10 +969,56 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
                                 </div>
                               </div>
                             </div>
+
+                            {/* Apply the plan as one step. The predicted risk
+                                above is the probability once EVERY action is in
+                                place, so this is the button that actually
+                                delivers it — the per-action buttons below move
+                                one feature at a time. */}
+                            {outstanding.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleApplyPlan({ ...plan, changes: outstanding })}
+                                disabled={applying !== null}
+                                title={`Write all ${outstanding.length} changes to MongoDB and re-run the model once`}
+                                className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-[11px] font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {planBusy ? (
+                                  <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    Applying {planName}…
+                                  </>
+                                ) : (
+                                  <>
+                                    <Zap className="h-3.5 w-3.5" />
+                                    Apply all of {planName}
+                                    {outstanding.length < plan.changes.length
+                                      ? ` (${outstanding.length} left)`
+                                      : ` (${outstanding.length} action${outstanding.length > 1 ? "s" : ""})`}
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <div className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {planName} is fully applied
+                              </div>
+                            )}
                             <div className="space-y-2">
                               {plan.changes.map((chg, ci) => {
                                 const isApplying = applying === chg.feature_changed;
-                                const alreadyApplied = chg.applied;
+                                // Two ways a counterfactual can be a no-op: the
+                                // server marked it applied, or the employee
+                                // record already holds the suggested value (a
+                                // cached plan set that predates a change).
+                                // Either way, offering "Apply live" would only
+                                // produce an error, so we don't.
+                                const liveValue = emp[chg.feature_changed];
+                                const alreadyAtTarget =
+                                  liveValue !== undefined &&
+                                  liveValue !== null &&
+                                  String(liveValue) === String(chg.suggested_value);
+                                const alreadyApplied = chg.applied || alreadyAtTarget;
                                 return (
                                   <div key={ci} className="rounded-xl bg-white border border-slate-200 px-3 py-2">
                                     <div className="flex items-start justify-between gap-3">
@@ -820,9 +1030,16 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
                                       </div>
 
                                       {alreadyApplied ? (
-                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700">
+                                        <span
+                                          title={
+                                            chg.applied
+                                              ? "This counterfactual was written to MongoDB."
+                                              : `${chg.feature_label} is already ${chg.suggested_value} on this employee.`
+                                          }
+                                          className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700"
+                                        >
                                           <CheckCircle2 className="h-3.5 w-3.5" />
-                                          Applied
+                                          {chg.applied ? "Applied" : "Already in effect"}
                                         </span>
                                       ) : (
                                         <button
@@ -860,9 +1077,9 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
                 {/* No interventions if risk is already Low */}
                 {plans.length === 0 && analysis.risk_tier === "Low" && (
                   <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-                    <div className="text-base font-bold text-emerald-800">Low Attrition Risk ✓</div>
+                    <div className="text-base font-bold text-emerald-800">Low attrition risk</div>
                     <div className="text-sm text-emerald-700 mt-1">
-                      This employee is below the high-risk threshold. No urgent interventions required — continue standard engagement.
+                      Below the high-risk threshold. No counterfactual plans were generated.
                     </div>
                   </div>
                 )}

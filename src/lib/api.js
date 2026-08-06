@@ -91,6 +91,21 @@ export const api = {
   me: () => request("/me"),
   updateMe: (patch) => request("/me", { method: "PATCH", body: patch }),
   setActiveRole: (role) => request("/me/active-role", { method: "POST", body: { role } }),
+  /** Marks the one-time post-sign-up profile step as done. */
+  finishOnboarding: (profile) => request("/me/onboarding", { method: "POST", body: profile }),
+
+  /**
+   * The applicant's own CV library. Documents are uploaded once (normally at
+   * sign-up), parsed by module 1 there and then, and reused on every
+   * application — so applying is a pick from this list, not another upload.
+   */
+  myCvs: {
+    list: () => request("/me/cvs"),
+    upload: (formData) => request("/me/cvs", { method: "POST", formData }),
+    rename: (fileId, label) => request(`/me/cvs/${fileId}`, { method: "PATCH", body: { label } }),
+    setDefault: (fileId) => request(`/me/cvs/${fileId}/default`, { method: "POST" }),
+    remove: (fileId) => request(`/me/cvs/${fileId}`, { method: "DELETE" }),
+  },
 
   users: {
     list: (params) => request(`/users${qs(params)}`),
@@ -107,7 +122,11 @@ export const api = {
     eligibility: (id) => request(`/jobs/${id}/eligibility`),
     create: (job) => request("/jobs", { method: "POST", body: job }),
     update: (id, patch) => request(`/jobs/${id}`, { method: "PATCH", body: patch }),
-    archive: (id) => request(`/jobs/${id}`, { method: "DELETE" }),
+    /** Stop accepting applications. Reversible, and the applicant side sees it. */
+    stop: (id) => request(`/jobs/${id}/stop`, { method: "POST" }),
+    reopen: (id) => request(`/jobs/${id}/reopen`, { method: "POST" }),
+    /** 409 `job_still_open` until the posting has been stopped. */
+    remove: (id) => request(`/jobs/${id}`, { method: "DELETE" }),
   },
 
   applications: {
@@ -164,6 +183,13 @@ export const api = {
   attrition: {
     actionableFeatures: () => request("/attrition/actionable-features"),
     apply: (employeeNumber, payload) => request(`/attrition/${employeeNumber}/apply`, { method: "POST", body: payload }),
+    /**
+     * Apply every action in a plan together. The model runs once on the final
+     * state, so the probability returned is the one the plan predicted — not
+     * the partial result of applying its actions one at a time.
+     */
+    applyPlan: (employeeNumber, payload) =>
+      request(`/attrition/${employeeNumber}/apply-plan`, { method: "POST", body: payload }),
     revert: (employeeNumber) => request(`/attrition/${employeeNumber}/revert`, { method: "POST" }),
     topRisk: (limit = 5) => request(`/attrition/top-risk${qs({ limit })}`),
     distribution: () => request("/attrition/distribution"),

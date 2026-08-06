@@ -1,17 +1,17 @@
 /**
  * NewJobModal — the admin "open a job posting" form.
  *
- * This is what the Topbar's "+ New" button on the Job Recruitment screen opens.
- * It is deliberately separate from the Fair Candidate Screener panel in
- * JobPostsOnly.jsx: that panel runs an ad-hoc JD against a batch of CVs for
- * ranking and never touches the `jobs` collection. This form is what actually
- * creates a `Job` document — the thing applicants browse and apply to.
+ * This is what the "New job posting" panel opens — it sits inside the Job
+ * Recruitment screen, directly above "Latest Job Posts" (it used to be a
+ * "+ New" button in the header). This form is what creates a `Job` document,
+ * the thing applicants browse and apply to; fair screening then runs against
+ * the CVs those applicants submit.
  *
  * Required skills are NOT typed in by hand. As soon as there's enough
  * description text (typed, pasted, or pulled from an uploaded JD file), it is
  * sent to Module 1's `/extract-text` skill extractor — the exact same
- * endpoint and response shape JobPostsOnly already uses for JD skills in the
- * Fair Candidate Screener — and the result is shown as removable chips. The
+ * endpoint and response shape JobPostsOnly already uses for the JD skills in
+ * its screening results — and the result is shown as removable chips. The
  * short summary is no longer typed either: it's derived from the description
  * text at publish time.
  */

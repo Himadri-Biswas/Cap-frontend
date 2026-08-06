@@ -72,6 +72,8 @@ export function SessionProvider({ children }) {
       clerkUser,
       user,
       employee: profile?.employee || null,
+      /** The applicant's stored CV library, loaded with the session. */
+      cvs: profile?.cvs || [],
       counts: profile?.counts || {},
       roles: user?.roles || [],
       activeRole: user?.activeRole || null,

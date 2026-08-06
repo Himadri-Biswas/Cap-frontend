@@ -104,6 +104,15 @@ const interventionSchema = new mongoose.Schema(
     risk_reduction: Number,
     intervention_label: String,
 
+    /**
+     * The probability the real model returns for this counterfactual, measured
+     * when the plan was stored. `new_attrition_prob` is module 3's own estimate
+     * and runs consistently higher, so this is what the UI shows — applying the
+     * plan performs the identical computation and lands on the same number.
+     */
+    verified_prob: Number,
+    verified_at: Date,
+
     // additive: "LIVE attrition" bookkeeping
     applied: { type: Boolean, default: false, index: true },
     applied_at: Date,
@@ -136,6 +145,29 @@ const attritionEventSchema = new mongoose.Schema(
     to_value: mongoose.Schema.Types.Mixed,
     cf_index: Number,
     intervention_label: String,
+
+    /**
+     * Every change this event covers.
+     *
+     * A whole DiCE plan can be applied in one go, which moves several features
+     * together and re-runs the model once — so one event describes N changes
+     * and `prob_before`/`prob_after` belong to the batch, not to any single
+     * feature. A single-feature apply writes a one-element array here too, so
+     * reverting and the change-history list have one shape to read.
+     */
+    changes: {
+      type: [
+        {
+          _id: false,
+          feature: String,
+          feature_label: String,
+          from_value: mongoose.Schema.Types.Mixed,
+          to_value: mongoose.Schema.Types.Mixed,
+        },
+      ],
+      default: [],
+    },
+    planLabel: String,
 
     prob_before: Number,
     prob_after: Number,

@@ -125,6 +125,9 @@ userSchema.methods.toPublic = function () {
     skills: this.skills || [],
     defaultCvFileId: this.defaultCvFileId ? String(this.defaultCvFileId) : null,
     defaultCvFilename: this.defaultCvFilename || "",
+    // Null until the applicant finishes the one-time profile + CV step that
+    // runs straight after sign-up. App.jsx routes on this.
+    onboardedAt: this.onboardedAt || null,
     status: this.status,
     createdAt: this.createdAt,
     lastLoginAt: this.lastLoginAt,
