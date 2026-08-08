@@ -104,7 +104,7 @@ function SimpleDashboard({ jobs = [], employees = [], onNavigate }) {
               People at risk of leaving
             </span>
             <div className="mt-3 flex items-end gap-4">
-              <span className="num display-xl text-[88px] text-[#ff7a8f]">
+              <span className="num display-xl text-grad text-[88px] text-[#ff7a8f]">
                 <CountUp value={atRisk} />
               </span>
               <span className="mb-3 text-sm leading-5 feature-dim">

@@ -1,5 +1,5 @@
 import React from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useSpring } from "framer-motion";
 
 /**
  * Motion primitives.
@@ -186,4 +186,14 @@ export function RuleIn({ className = "" }) {
       style={{ transformOrigin: "left center" }}
     />
   );
+}
+
+
+/** How far down the page you are, as a hairline pinned to the top. */
+export function ReadProgress() {
+  const still = useReducedMotion();
+  const { scrollYProgress } = useScroll();
+  const width = useSpring(scrollYProgress, { stiffness: 180, damping: 30, restDelta: 0.001 });
+  if (still) return null;
+  return <motion.div aria-hidden="true" className="read-progress" style={{ scaleX: width }} />;
 }

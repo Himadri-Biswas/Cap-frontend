@@ -193,7 +193,7 @@ export default function PeopleView({ search = "" }) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="data-table w-full min-w-[720px]">
+            <table className="data-table data-table--brand w-full min-w-[720px]">
               <thead className="bg-ink-850 text-left">
                 <tr className="text-xs font-semibold uppercase tracking-wider text-mist-500">
                   <th className="px-4 py-3">Person</th>

@@ -33,23 +33,23 @@
      colour, the card has to be drawn with a heavy border and the whole
      screen goes flat. One step of separation is enough. */
   --color-ink-950: #ffffff; /* on-accent text */
-  --color-ink-900: #f6f7f9; /* page canvas */
-  --color-ink-850: #f1f2f6; /* sunken: inputs, table headers, wells */
-  --color-ink-800: #ffffff; /* panel */
-  --color-ink-750: #f7f8fa; /* hover / raised */
-  --color-ink-700: #eef0f4; /* filled chip */
-  --color-ink-600: #e6e8ee; /* hairline border */
-  --color-ink-500: #d7dae3; /* stronger border */
-  --color-ink-400: #b9bfcc; /* strongest border */
+  --color-ink-900: #e7e9ef; /* page canvas */
+  --color-ink-850: #eef0f5; /* sunken: inputs, table headers, wells */
+  --color-ink-800: #fbfbfd; /* panel */
+  --color-ink-750: #f4f5f9; /* hover / raised */
+  --color-ink-700: #e7e9f0; /* filled chip */
+  --color-ink-600: #dcdfe8; /* hairline border */
+  --color-ink-500: #c6cbd8; /* stronger border */
+  --color-ink-400: #a6adbe; /* strongest border */
 
   /* ── Ink ramp ─────────────────────────────────────────────────────────
      Five steps, each with a job: headings, body, secondary, muted, faint.
      Everything down to `mist-500` clears 4.5:1 on white. */
-  --color-paper: #101319;
-  --color-mist-200: #3a4049;
-  --color-mist-400: #5f6672;
-  --color-mist-500: #7b8494;
-  --color-mist-700: #a4abb8;
+  --color-paper: #0d1017;
+  --color-mist-200: #333944;
+  --color-mist-400: #58606e;
+  --color-mist-500: #737c8c;
+  --color-mist-700: #99a1b1;
 
   /* ── The matched pair ─────────────────────────────────────────────────
      `raw` is always the uncorrected reading, `fair` the corrected one.
@@ -84,8 +84,8 @@
      Two stacked shadows, both nearly transparent: a tight one for the
      contact edge and a wide soft one for the lift. A single blurry
      `shadow-lg` is what makes a page look like a template. */
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.05);
-  --shadow-lift: 0 2px 4px rgba(16, 24, 40, 0.04), 0 8px 20px -6px rgba(16, 24, 40, 0.1);
+  --shadow-card: 0 1px 2px rgba(13, 16, 23, 0.05), 0 1px 3px rgba(13, 16, 23, 0.06);
+  --shadow-lift: 0 2px 4px rgba(13, 16, 23, 0.05), 0 10px 24px -8px rgba(13, 16, 23, 0.14);
   --shadow-pop: 0 4px 8px rgba(16, 24, 40, 0.05), 0 20px 40px -12px rgba(16, 24, 40, 0.16);
 
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
@@ -636,4 +636,197 @@ input[type="number"]::-webkit-inner-spin-button {
   font-variant-numeric: tabular-nums;
   font-size: 0.94em;
   color: var(--color-paper);
+}
+
+
+/* ==========================================================================
+   Type treatments
+
+   A page reads as designed when headings do more than change size. These are
+   the four moves used across the product; each does one job and they are
+   never stacked on top of each other.
+   ========================================================================== */
+
+/* Two-tone heading. The statement carries the weight, the qualifier drops to
+   a lighter weight and a step down in colour, so a long heading still has a
+   focal point. */
+.h-split > em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--color-mist-500);
+}
+
+/* Display numbers only. The gradient runs across the glyphs rather than
+   behind them, which keeps the figure crisp at 80px where a flat tint goes
+   dull. Never applied to body text. */
+.text-grad {
+  background: linear-gradient(155deg, currentColor 12%, color-mix(in oklab, currentColor 55%, transparent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Marks a figure quoted mid-sentence so it ties back to the table above. */
+.mark {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--color-brand) 12%, transparent);
+  color: color-mix(in oklab, var(--color-brand) 82%, #000);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92em;
+}
+
+/* A pulled statement between sections. Not a quote from anyone — a finding,
+   set large and loose so the eye stops on it. */
+.pull {
+  font-family: var(--font-display);
+  font-size: clamp(17px, 1.9vw, 22px);
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.35;
+  color: var(--color-paper);
+  max-width: 34ch;
+}
+
+/* Link with an underline that grows from the left on hover. */
+.link-grow {
+  position: relative;
+  color: var(--color-brand);
+  text-decoration: none;
+}
+.link-grow::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 260ms var(--ease-out-soft);
+}
+.link-grow:hover::after {
+  transform: scaleX(1);
+}
+
+/* ==========================================================================
+   Table identities
+
+   Each table in a report answers a different question, so each carries its
+   own accent: the header band, its label colour and the row hover all shift
+   together. Reading down a long report you can tell at a glance whether you
+   are looking at an uncorrected reading, a corrected one, or a decision —
+   before reading a single word.
+
+   The accent is a tint, never the text colour of the data itself, so
+   contrast on the figures is unaffected.
+   ========================================================================== */
+
+.data-table {
+  --tbl-accent: var(--color-mist-500);
+  --tbl-head: var(--color-ink-850);
+  --tbl-hover: var(--color-ink-750);
+}
+.data-table--raw {
+  --tbl-accent: var(--color-raw);
+  --tbl-head: #fdf6e9;
+  --tbl-hover: #fefaf2;
+}
+.data-table--fair {
+  --tbl-accent: var(--color-fair);
+  --tbl-head: #e9f6f4;
+  --tbl-hover: #f3fbfa;
+}
+.data-table--risk {
+  --tbl-accent: var(--color-risk);
+  --tbl-head: #fdedef;
+  --tbl-hover: #fef6f7;
+}
+.data-table--brand {
+  --tbl-accent: var(--color-brand);
+  --tbl-head: #efeefc;
+  --tbl-hover: #f7f6fe;
+}
+.data-table--ok {
+  --tbl-accent: var(--color-ok);
+  --tbl-head: #e8f6f0;
+  --tbl-hover: #f3fbf7;
+}
+
+.data-table thead th {
+  background: var(--tbl-head);
+  color: var(--tbl-accent);
+  border-bottom: 1px solid color-mix(in oklab, var(--tbl-accent) 22%, transparent);
+}
+.data-table tbody tr:hover {
+  background: var(--tbl-hover);
+}
+/* A 2px spine in the accent, drawn on the first cell of every row. It gives a
+   wide table a left edge to track against without adding a border column. */
+.data-table tbody td:first-child {
+  box-shadow: inset 2px 0 0 -1px color-mix(in oklab, var(--tbl-accent) 28%, transparent);
+}
+.data-table tfoot td {
+  background: color-mix(in oklab, var(--tbl-head) 70%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--tbl-accent) 20%, transparent);
+}
+
+
+/* ==========================================================================
+   Motion, Linear-style
+
+   Their signature is not big movement — it is that everything settles on the
+   same fast, slightly overshooting curve, and that hover feedback lands in
+   under 150ms. Short distances, quick curves, no bounce on anything holding
+   text.
+   ========================================================================== */
+
+:root {
+  --ease-linear: cubic-bezier(0.25, 0.46, 0.45, 0.98);
+  --ease-settle: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Table rows arrive in sequence rather than all at once. Capped at 14 so a
+   200-row table doesn't take four seconds to appear. */
+.data-table tbody tr {
+  animation: rowIn 420ms var(--ease-settle) both;
+  animation-delay: calc(var(--r, 0) * 22ms);
+}
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Interactive surfaces settle rather than ease. */
+.panel-hit,
+.data-table tbody tr,
+button {
+  transition-timing-function: var(--ease-settle);
+}
+
+/* A hairline progress bar pinned to the top of the viewport, filled by how
+   far down a long report you are. */
+.read-progress {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 50;
+  height: 2px;
+  width: 100%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--color-brand), var(--color-fair));
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .data-table tbody tr {
+    animation: none;
+  }
 }

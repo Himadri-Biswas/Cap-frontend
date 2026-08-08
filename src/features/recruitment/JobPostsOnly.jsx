@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import Pill from "../../components/ui/Pill.jsx";
 import Delta from "../../components/Delta.jsx";
-import { Reveal, CountUp } from "../../components/Motion.jsx";
+import { Reveal, CountUp, ReadProgress } from "../../components/Motion.jsx";
 import Section, { PageIntro } from "../../components/Section.jsx";
 import Modal from "../../components/ui/Modal.jsx";
 import CvViewer from "../../components/CvViewer.jsx";
@@ -189,10 +189,16 @@ const TH = ({ children, align = "left", className = "" }) => (
   </th>
 );
 
-function ScrollTable({ children }) {
+/**
+ * A table in the report. `tone` sets which question it answers:
+ *   raw   — an uncorrected reading      fair — a corrected one
+ *   risk  — bias being charged          ok   — bias being removed
+ *   brand — a decision
+ */
+function ScrollTable({ children, tone = "" }) {
   return (
     <div className="overflow-x-auto rounded-tile border border-ink-600">
-      <table className="data-table w-full min-w-[540px]">{children}</table>
+      <table className={cx("data-table w-full min-w-[540px]", tone && `data-table--${tone}`)}>{children}</table>
     </div>
   );
 }
@@ -230,7 +236,7 @@ function PagedBody({ columns, items, row, step = PAGE_STEP, resetKey }) {
 
   return (
     <>
-      <tbody>{items.slice(0, shown).map(row)}</tbody>
+      <tbody>{items.slice(0, shown).map((item, i) => row(item, i))}</tbody>
       {remaining > 0 && (
         <tfoot>
           <tr>
@@ -1071,6 +1077,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
 
     return (
       <div ref={resultsRef} className="stack-page">
+        <ReadProgress />
         {/* Run header */}
         <div className="rounded-panel border border-ink-600 bg-ink-850 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1082,9 +1089,9 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                 <div className="display text-xl text-white">
                   Fair screening — {screenedJob.title || rankingResult?.metadata?.job_title || "this role"}
                 </div>
-                <div className="mt-1.5 text-xs feature-dim">
-                  {candidates.length} stored CV{candidates.length > 1 ? "s" : ""}, scored twice: once by the initial
-                  model, once after debiasing.
+                <div className="mt-2 max-w-md text-[13px] leading-6 feature-dim">
+                  {candidates.length} stored CV{candidates.length > 1 ? "s" : ""}, scored twice — once by the original
+                  model, once with background removed. Everything below compares the two readings.
                 </div>
               </div>
             </div>
@@ -1159,7 +1166,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
           title="What the original model scored"
           lede="Each CV against this job description, before anything was corrected. This is the number the old pipeline would have hired on."
         >
-          <ScrollTable>
+          <ScrollTable tone="raw">
             <thead className="bg-ink-850">
               <tr>
                 <TH>Candidate</TH>
@@ -1196,7 +1203,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
           title="How much of that came from background"
           lede="Points each candidate gained or lost for who they are rather than what they wrote. A plus means the model added them; a minus means it took them away."
         >
-          <ScrollTable>
+          <ScrollTable tone="risk">
             <thead className="bg-ink-850">
               <tr>
                 <TH>Candidate</TH>
@@ -1256,7 +1263,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
           title="What is left after debiasing"
           lede="The same four factors measured again on the corrected model. The closer every figure sits to zero, the less a background still moves a score."
         >
-          <ScrollTable>
+          <ScrollTable tone="fair">
             <thead className="bg-ink-850">
               <tr>
                 <TH>Candidate</TH>
@@ -1325,7 +1332,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                   </div>
 
                   <div className="mt-3 overflow-x-auto rounded-tile border border-ink-600 bg-ink-800">
-                    <table className="data-table w-full min-w-[520px] text-xs">
+                    <table className="data-table data-table--risk w-full min-w-[520px] text-xs">
                       <thead className="bg-ink-850">
                         <tr>
                           <TH>Background factor</TH>
@@ -1401,7 +1408,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
           title="How much the correction removed"
           lede="Points of background effect the debiased model stripped out, per person."
         >
-          <ScrollTable>
+          <ScrollTable tone="ok">
             <thead className="bg-ink-850">
               <tr>
                 <TH>Candidate</TH>
@@ -1454,7 +1461,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
           title="How the corrected model ranks them"
           lede="The same CVs against the same job, scored once background stopped counting. Best first."
         >
-          <ScrollTable>
+          <ScrollTable tone="fair">
             <thead className="bg-ink-850">
               <tr>
                 <TH align="center">Rank</TH>
@@ -1544,7 +1551,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                   Step 8 · Fairness impact
                 </div>
                 <div className="mt-2 flex items-baseline gap-3">
-                  <span className="num display-xl text-[68px] text-[#3ee0cd]">
+                  <span className="num display-xl text-grad text-[68px] text-[#3ee0cd]">
                     <CountUp value={improvement.spread_reduction_pct ?? 0} decimals={1} suffix="%" />
                   </span>
                   <span className="text-sm font-medium feature-dim">of the score gap closed</span>
@@ -2121,7 +2128,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
               // the ranking on the left, whoever is selected on the right.
               <div className="mt-3 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
                 <div className="overflow-hidden rounded-tile border border-ink-600">
-                  <table className="data-table w-full">
+                  <table className="data-table data-table--brand w-full">
                     <thead className="bg-ink-850">
                       <tr className="text-left text-mist-400">
                         <th className="w-14 px-3 py-2 font-semibold">Rank</th>

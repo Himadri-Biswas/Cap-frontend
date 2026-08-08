@@ -57,7 +57,13 @@ export default function Section({
               </div>
             )}
 
-            <TextReveal as="h3" text={title} className="title-lg text-[clamp(19px,2.1vw,25px)]" />
+            {/* The clause after a comma drops a weight and a shade, so even a
+                long heading keeps one focal point. */}
+            <TextReveal
+              as="h3"
+              text={title}
+              className="title-lg h-split text-[clamp(20px,2.2vw,26px)]"
+            />
 
             {lede && (
               <p className="mt-3 max-w-[62ch] text-[13.5px] leading-[1.65] text-mist-400">{lede}</p>
@@ -87,7 +93,7 @@ export function PageIntro({ kicker, title, lede, actions, className = "" }) {
             <RuleIn className="h-px w-16 bg-ink-600" />
           </div>
         )}
-        <TextReveal as="h2" text={title} className="display-xl text-[clamp(26px,3.4vw,40px)] text-paper" />
+        <TextReveal as="h2" text={title} className="display-xl h-split text-[clamp(28px,3.6vw,42px)] text-paper" />
         {lede && <p className="mt-4 max-w-[58ch] text-[14.5px] leading-[1.7] text-mist-400">{lede}</p>}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
