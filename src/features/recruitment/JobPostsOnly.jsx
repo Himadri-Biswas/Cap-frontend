@@ -26,7 +26,14 @@ import { Reveal, CountUp, ReadProgress } from "../../components/Motion.jsx";
 import Section, { PageIntro } from "../../components/Section.jsx";
 import Modal from "../../components/ui/Modal.jsx";
 import CvViewer from "../../components/CvViewer.jsx";
-import ApplicantTags, { LastAppliedNote, TONE_BAR_CLASS, TONE_ROW_CLASS, tagTone } from "../../components/ApplicantTags.jsx";
+import ApplicantTags, {
+  ApplicantHistoryModal,
+  HistoryButton,
+  LastAppliedNote,
+  TONE_BAR_CLASS,
+  TONE_ROW_CLASS,
+  tagTone,
+} from "../../components/ApplicantTags.jsx";
 import { cx } from "../../lib/cx.js";
 import { api } from "../../lib/api.js";
 
@@ -281,6 +288,8 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
   const [view, setView] = useState("list");
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
+  // The candidate whose full application history is open in a modal, or null.
+  const [historyCandidate, setHistoryCandidate] = useState(null);
 
   // Stop / reopen / delete on a posting
   const [jobBusyId, setJobBusyId] = useState(null);
@@ -1801,7 +1810,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                           : "border-ink-600 bg-ink-800"
                   )}
                 >
-                  {/* Tone stripe: green = returning, red = rejected before */}
+                  {/* Tone stripe: green = returning/shortlisted before, red = rejected before */}
                   <span className={cx("absolute left-0 top-0 h-full w-1", TONE_BAR_CLASS[applicant?.tone] || "bg-transparent")} />
 
                   <div className="flex flex-wrap items-start justify-between gap-3 pl-2">
@@ -1829,6 +1838,15 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                           </div>
                         )}
 
+                        {/* Was shortlisted on an earlier application — a positive
+                            signal distinct from having worked here. */}
+                        {applicant?.wasPreviouslyShortlisted && (
+                          <div className="mt-2 inline-block rounded-tile border border-ok/35 bg-ink-800 px-3 py-1.5 text-[11px] text-ok">
+                            <span className="font-semibold">Shortlisted {applicant.previousShortlistCount}×</span> before,
+                            re-applying.
+                          </div>
+                        )}
+
                         {/* Item 12 — the applied-before-and-rejected history, kept intact */}
                         {applicant?.wasPreviouslyRejected && (
                           <div className="mt-2 inline-block rounded-tile border border-risk/35 bg-ink-800 px-3 py-1.5 text-[11px] text-risk">
@@ -1837,6 +1855,13 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                           </div>
                         )}
                         {applicant ? <LastAppliedNote application={applicant} /> : null}
+                        {applicant?.previousApplicationCount > 0 && (
+                          <HistoryButton
+                            count={applicant.previousApplicationCount}
+                            onClick={() => setHistoryCandidate(applicant)}
+                            className="mt-2"
+                          />
+                        )}
                       </div>
                     </div>
 
@@ -2152,7 +2177,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                             onClick={() => setSelectedCandidateId(candidate.id)}
                           >
                             <td className="relative px-3 py-2 font-mono text-mist-200">
-                              {/* Tone stripe: green = returning, red = rejected before */}
+                              {/* Tone stripe: green = returning/shortlisted before, red = rejected before */}
                               <span
                                 className={cx(
                                   "absolute left-0 top-0 h-full w-1",
@@ -2258,6 +2283,15 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                         </div>
                       )}
 
+                      {selectedCandidate.wasPreviouslyShortlisted && (
+                        <div className="mt-2 rounded-tile border border-ok/35 bg-ink-800 px-3 py-2 text-xs text-ok">
+                          <span className="font-semibold">
+                            Shortlisted {selectedCandidate.previousShortlistCount}×
+                          </span>{" "}
+                          before, re-applying.
+                        </div>
+                      )}
+
                       {selectedCandidate.wasPreviouslyRejected && (
                         <div className="mt-2 rounded-tile border border-risk/35 bg-ink-800 px-3 py-2 text-xs text-risk">
                           <span className="font-semibold">
@@ -2269,6 +2303,13 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
 
                       {/* "Admin can click his entry and see his last applied date" */}
                       <LastAppliedNote application={selectedCandidate} />
+                      {selectedCandidate.previousApplicationCount > 0 && (
+                        <HistoryButton
+                          count={selectedCandidate.previousApplicationCount}
+                          onClick={() => setHistoryCandidate(selectedCandidate)}
+                          className="mt-2"
+                        />
+                      )}
 
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <div className="rounded-tile border border-ink-600 bg-ink-800 px-3 py-2">
@@ -2527,7 +2568,15 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
       >
         {cvModal && (
           <div className="space-y-4">
-            {cvModal.tags?.length ? <ApplicantTags tags={cvModal.tags} /> : null}
+            <div className="flex flex-wrap items-center gap-2">
+              {cvModal.tags?.length ? <ApplicantTags tags={cvModal.tags} /> : null}
+              {cvModal.previousApplicationCount > 0 && (
+                <HistoryButton
+                  count={cvModal.previousApplicationCount}
+                  onClick={() => setHistoryCandidate(cvModal)}
+                />
+              )}
+            </div>
             <CvViewer
               fileId={cvModal.cvFileId}
               filename={cvModal.cvOriginalName}
@@ -2537,6 +2586,14 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
           </div>
         )}
       </Modal>
+
+      {/* Full prior-application timeline behind a "previously shortlisted" /
+          "previously rejected" tag — opened from any History button above. */}
+      <ApplicantHistoryModal
+        open={!!historyCandidate}
+        onClose={() => setHistoryCandidate(null)}
+        applicant={historyCandidate}
+      />
     </div>
   );
 }

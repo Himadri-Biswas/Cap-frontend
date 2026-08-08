@@ -4,15 +4,17 @@
  * The tone carries the meaning, so it reads at a glance without being read:
  *   emerald = welcome back (former employee)     → POSITIVE
  *   sky     = already one of us (internal)       → POSITIVE
+ *   emerald = we shortlisted them before          → POSITIVE
  *   rose    = we said no before                  → NEGATIVE
  *   slate   = neutral context (repeat applicant)
  *
- * Tags are computed on the server from employment and rejection history, so
- * nothing here is hand-assigned.
+ * Tags are computed on the server from employment, shortlist and rejection
+ * history, so nothing here is hand-assigned.
  */
 import React from "react";
-import { Ban, BadgeCheck, History, RotateCcw, ThumbsDown } from "lucide-react";
+import { Ban, BadgeCheck, History, RotateCcw, Star, ThumbsDown } from "lucide-react";
 import { cx } from "../lib/cx.js";
+import Modal from "./ui/Modal.jsx";
 
 export const TAG_META = {
   former_employee: {
@@ -34,6 +36,16 @@ export const TAG_META = {
     solid: "border-brand/45 bg-brand/18 text-brand-hi",
     ring: "ring-brand/35",
     description: "Currently employed here and applying for a different role.",
+  },
+  previously_shortlisted: {
+    label: "Previously shortlisted",
+    short: "Shortlisted before",
+    icon: Star,
+    tone: "positive",
+    className: "border-ok/35 bg-ok/12 text-ok",
+    solid: "border-ok/35 bg-ok/12 text-ok",
+    ring: "ring-ok/35",
+    description: "Reached the shortlist on an earlier application, even if not ultimately hired.",
   },
   previously_rejected: {
     label: "Previously rejected",
@@ -68,7 +80,14 @@ export const TAG_META = {
 };
 
 /** Sorted so the strongest signal is read first. */
-const ORDER = ["former_employee", "internal_candidate", "rehire_ineligible", "previously_rejected", "repeat_applicant"];
+const ORDER = [
+  "former_employee",
+  "internal_candidate",
+  "previously_shortlisted",
+  "rehire_ineligible",
+  "previously_rejected",
+  "repeat_applicant",
+];
 
 export function sortTags(tags = []) {
   return ORDER.filter((t) => tags.includes(t));
@@ -76,10 +95,11 @@ export function sortTags(tags = []) {
 
 /** The dominant tone of a candidate, used to tint their whole row/card. */
 export function tagTone(tags = []) {
-  if (tags.includes("rehire_ineligible") || tags.includes("previously_rejected")) {
-    return tags.includes("former_employee") || tags.includes("internal_candidate") ? "mixed" : "negative";
-  }
-  if (tags.includes("former_employee") || tags.includes("internal_candidate")) return "positive";
+  const positive =
+    tags.includes("former_employee") || tags.includes("internal_candidate") || tags.includes("previously_shortlisted");
+  const negative = tags.includes("rehire_ineligible") || tags.includes("previously_rejected");
+  if (negative) return positive ? "mixed" : "negative";
+  if (positive) return "positive";
   return "neutral";
 }
 
@@ -154,5 +174,78 @@ export function LastAppliedNote({ application }) {
           : ""}
       </span>
     </div>
+  );
+}
+
+/** Small pill that opens the full application-history modal below. */
+export function HistoryButton({ onClick, count = 0, className = "" }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        "inline-flex items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-2.5 py-1 text-[11px] font-semibold text-mist-400 transition hover:border-brand/40 hover:text-paper",
+        className
+      )}
+    >
+      <History className="h-3.5 w-3.5" aria-hidden="true" />
+      History{count > 1 ? ` (${count})` : ""}
+    </button>
+  );
+}
+
+const HISTORY_STATUS_TONE = {
+  shortlisted: "text-ok",
+  interview: "text-ok",
+  offered: "text-ok",
+  hired: "text-ok",
+  rejected: "text-risk",
+  withdrawn: "text-mist-500",
+  submitted: "text-mist-400",
+  under_review: "text-mist-400",
+};
+
+/**
+ * Every prior application this person has on record — every job, every
+ * outcome — so an admin can see the whole re-application picture behind a
+ * "previously shortlisted" / "previously rejected" tag, not just the count.
+ */
+export function ApplicantHistoryModal({ open, onClose, applicant }) {
+  const rows = applicant?.previousApplications || [];
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={applicant?.name ? `${applicant.name} — application history` : "Application history"}
+      subtitle={rows.length ? `${rows.length} previous application${rows.length > 1 ? "s" : ""}` : "No previous applications on record"}
+      size="md"
+    >
+      {applicant?.tags?.length ? <ApplicantTags tags={applicant.tags} className="mb-4" /> : null}
+      {rows.length ? (
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <li
+              key={r.applicationId}
+              className="flex items-center justify-between gap-3 rounded-tile border border-ink-600 bg-ink-800 px-3 py-2.5"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-paper">{r.jobTitle || r.jobId}</div>
+                <div className="mt-0.5 text-xs text-mist-500">
+                  {r.appliedAt ? new Date(r.appliedAt).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—"}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                {r.score != null ? <span className="num text-xs text-mist-400">{Math.round(r.score * 100)}%</span> : null}
+                <span className={cx("text-xs font-semibold capitalize", HISTORY_STATUS_TONE[r.status] || "text-mist-400")}>
+                  {(r.status || "—").replace(/_/g, " ")}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-mist-500">This is their first application on record.</p>
+      )}
+    </Modal>
   );
 }
