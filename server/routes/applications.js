@@ -275,18 +275,22 @@ router.post(
     // ── 5. Tell the admin, with the tag baked into the alert ────────────
     const tagNote = application.isFormerEmployee
       ? " · former employee returning"
-      : application.wasPreviouslyRejected
-        ? " · previously rejected, re-applying"
-        : application.isInternalCandidate
-          ? " · internal candidate"
-          : "";
+      : application.wasPreviouslyShortlisted
+        ? " · shortlisted before, re-applying"
+        : application.wasPreviouslyRejected
+          ? " · previously rejected, re-applying"
+          : application.isInternalCandidate
+            ? " · internal candidate"
+            : "";
     await Notification.create({
       type: application.isFormerEmployee
         ? "former_employee_applied"
-        : application.wasPreviouslyRejected
-          ? "rejected_reapplied"
-          : "new_application",
-      severity: application.isFormerEmployee ? "medium" : "info",
+        : application.wasPreviouslyShortlisted
+          ? "shortlisted_reapplied"
+          : application.wasPreviouslyRejected
+            ? "rejected_reapplied"
+            : "new_application",
+      severity: application.isFormerEmployee || application.wasPreviouslyShortlisted ? "medium" : "info",
       title: `${application.applicantName} applied for ${job.title}`,
       body: `${skills.length} skills extracted · ${Math.round(scored.score * 100)}% match${tagNote}`,
       audienceRole: "admin",
@@ -568,6 +572,8 @@ function publicApplication(a, includePrivate) {
     tags: doc.tags || [],
     isFormerEmployee: !!doc.isFormerEmployee,
     isInternalCandidate: !!doc.isInternalCandidate,
+    wasPreviouslyShortlisted: !!doc.wasPreviouslyShortlisted,
+    previousShortlistCount: doc.previousShortlistCount || 0,
     wasPreviouslyRejected: !!doc.wasPreviouslyRejected,
     previousRejectionCount: doc.previousRejectionCount || 0,
     previousApplicationCount: doc.previousApplicationCount || 0,
@@ -599,6 +605,7 @@ function buildHighlights(doc) {
   const out = [];
   if (doc.isFormerEmployee) out.push("Former employee returning");
   if (doc.isInternalCandidate) out.push("Internal candidate");
+  if (doc.wasPreviouslyShortlisted) out.push(`Shortlisted ${doc.previousShortlistCount}× before`);
   if (doc.wasPreviouslyRejected) out.push(`Rejected ${doc.previousRejectionCount}× before`);
   if (doc.matchPct >= 70) out.push(`${doc.matchPct}% skill match`);
   if (doc.skillCount) out.push(`${doc.skillCount} skills extracted`);

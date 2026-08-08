@@ -7,8 +7,9 @@
  *     flattened `skills[]`/`score` pair so the existing Applicants table in
  *     JobPostsOnly.jsx renders unchanged,
  *   • the re-application tags the admin sees:
- *       isFormerEmployee     → POSITIVE tag ("worked here before")
- *       wasPreviouslyRejected→ NEGATIVE tag ("rejected before, applied again")
+ *       isFormerEmployee       → POSITIVE tag ("worked here before")
+ *       wasPreviouslyShortlisted → POSITIVE tag ("shortlisted before, on an earlier application")
+ *       wasPreviouslyRejected  → NEGATIVE tag ("rejected before, applied again")
  *   • `lastAppliedAt` / `previousApplications[]` so clicking an entry shows
  *     the last applied date,
  *   • `nextEligibleAt` implementing the re-apply freeze window (1 day).
@@ -29,6 +30,7 @@ export const APPLICATION_STATUSES = [
 export const APPLICANT_TAGS = [
   "former_employee", // POSITIVE — worked here before and left
   "internal_candidate", // POSITIVE — currently employed here
+  "previously_shortlisted", // POSITIVE — reached "shortlisted" (or beyond) on an earlier application
   "rehire_ineligible", // NEGATIVE — left and marked not eligible
   "previously_rejected", // NEGATIVE — applied before and was rejected
   "repeat_applicant", // NEUTRAL  — has applied to this job before
@@ -138,6 +140,8 @@ const applicationSchema = new mongoose.Schema(
     formerTenureYears: Number,
 
     isInternalCandidate: { type: Boolean, default: false },
+    wasPreviouslyShortlisted: { type: Boolean, default: false, index: true },
+    previousShortlistCount: { type: Number, default: 0 },
     wasPreviouslyRejected: { type: Boolean, default: false, index: true },
     previousRejectionCount: { type: Number, default: 0 },
     previousApplicationCount: { type: Number, default: 0 },

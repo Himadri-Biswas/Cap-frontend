@@ -1,12 +1,13 @@
 /**
  * applicants.js — the re-application intelligence behind the admin's tags.
  *
- * Three questions get answered here, all keyed off the applicant's email
+ * Four questions get answered here, all keyed off the applicant's email
  * (the one identifier that survives across a person's employment history):
  *
  *   1. Did this person work here before?      → POSITIVE tag `former_employee`
- *   2. Have we rejected them before?          → NEGATIVE tag `previously_rejected`
- *   3. When did they last apply, and may they apply again yet?
+ *   2. Did we shortlist them before?          → POSITIVE tag `previously_shortlisted`
+ *   3. Have we rejected them before?          → NEGATIVE tag `previously_rejected`
+ *   4. When did they last apply, and may they apply again yet?
  */
 import { Application, Employee, AppSetting } from "../models/index.js";
 import { config } from "../config.js";
@@ -82,6 +83,8 @@ export async function buildApplicantHistory({ clerkUserId, email, jobId }) {
     })),
     isFormerEmployee: false,
     isInternalCandidate: false,
+    wasPreviouslyShortlisted: false,
+    previousShortlistCount: 0,
     wasPreviouslyRejected: false,
     previousRejectionCount: 0,
     lastAppliedAt: null,
@@ -109,7 +112,23 @@ export async function buildApplicantHistory({ clerkUserId, email, jobId }) {
     }
   }
 
-  // ── 2. Rejection history → NEGATIVE tag ────────────────────────────────
+  // ── 2. Shortlist history → POSITIVE tag ─────────────────────────────────
+  // A prior application counts as "shortlisted" if it ever reached that
+  // stage — checking only the CURRENT status would miss anyone who moved on
+  // to interview/offered/hired (all past "shortlisted" in the pipeline) or
+  // who was shortlisted and only rejected later, since `status` holds just
+  // the final outcome, not the path there.
+  const wasEverShortlisted = (app) =>
+    ["shortlisted", "interview", "offered", "hired"].includes(app.status) ||
+    (app.statusHistory || []).some((event) => event.status === "shortlisted");
+  const shortlistedBefore = priorApps.filter(wasEverShortlisted);
+  if (shortlistedBefore.length) {
+    history.wasPreviouslyShortlisted = true;
+    history.previousShortlistCount = shortlistedBefore.length;
+    tags.add("previously_shortlisted");
+  }
+
+  // ── 3. Rejection history → NEGATIVE tag ─────────────────────────────────
   const rejected = priorApps.filter((a) => a.status === "rejected");
   if (rejected.length) {
     history.wasPreviouslyRejected = true;
@@ -117,7 +136,7 @@ export async function buildApplicantHistory({ clerkUserId, email, jobId }) {
     tags.add("previously_rejected");
   }
 
-  // ── 3. Last applied (any job) + repeat-applicant flag ──────────────────
+  // ── 4. Last applied (any job) + repeat-applicant flag ───────────────────
   if (priorApps.length) {
     const last = priorApps[0];
     history.lastAppliedAt = last.appliedAt;
