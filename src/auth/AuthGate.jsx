@@ -14,17 +14,19 @@ import React, { useState } from "react";
 import { SignIn, SignUp } from "@clerk/clerk-react";
 import { Loader2 } from "lucide-react";
 import { useSession } from "./SessionProvider.jsx";
+import { TextReveal } from "../components/Motion.jsx";
 import { cx } from "../lib/cx.js";
 
 const clerkAppearance = {
   variables: {
-    colorPrimary: "#5b57d9",
+    colorPrimary: "#8b7dff",
     colorBackground: "transparent",
-    colorText: "#101319",
-    colorTextSecondary: "#5f6672",
-    colorInputBackground: "#ffffff",
-    colorInputText: "#101319",
-    colorDanger: "#dc2743",
+    colorText: "#f2f3f6",
+    colorTextSecondary: "#9497a6",
+    colorInputBackground: "#0e0f14",
+    colorInputText: "#f2f3f6",
+    colorDanger: "#ff7086",
+    colorNeutral: "#f2f3f6",
     borderRadius: "8px",
     fontFamily: '"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
   },
@@ -39,12 +41,16 @@ const clerkAppearance = {
     formButtonPrimary:
       "bg-brand hover:bg-brand-hi text-white text-sm font-semibold normal-case rounded-[8px] h-11 shadow-none",
     formFieldInput:
-      "rounded-[8px] border border-ink-600 bg-white h-11 text-sm text-paper focus:border-brand/60 focus:ring-0",
+      "rounded-[8px] border border-ink-600 bg-ink-850 h-11 text-sm text-paper focus:border-brand/60 focus:ring-0",
     formFieldLabel: "text-[10px] font-medium uppercase tracking-[0.16em] text-mist-500",
     identityPreviewEditButton: "text-brand-hi",
+    identityPreviewText: "text-mist-200",
     footerActionLink: "text-brand-hi hover:text-brand",
     formFieldInputShowPasswordButton: "text-mist-500 hover:text-paper",
-    otpCodeFieldInput: "border-ink-600 bg-white text-paper",
+    otpCodeFieldInput: "border-ink-600 bg-ink-850 text-paper",
+    alertText: "text-mist-200",
+    formFieldSuccessText: "text-ok",
+    formFieldErrorText: "text-risk",
   },
   layout: { socialButtonsPlacement: "bottom", showOptionalFields: false },
 };
@@ -111,11 +117,26 @@ export default function AuthGate() {
             </span>
           </div>
 
-          <h1 className="display-xl mt-14 text-[60px] text-white">
-            Measure it.
-            <br />
-            <span className="feature-faint">Then correct it.</span>
-          </h1>
+          {/* The flagship moment: two lines, each landing in turn rather
+              than together, with one word set in the curved serif italic
+              this product allows itself exactly once per heading. */}
+          <div className="mt-14">
+            <TextReveal
+              as="h1"
+              text="Measure it."
+              blur
+              className="display-xl text-[60px] text-white"
+            />
+            <TextReveal
+              as="p"
+              text="Then correct it."
+              accentWord="correct"
+              accentClassName="text-brand-hi"
+              blur
+              delay={0.16}
+              className="display-xl text-[60px] feature-faint"
+            />
+          </div>
           <p className="mt-6 max-w-md text-sm leading-6 feature-dim">
             Three models, each producing the same shape of answer: a reading, and the same reading once the thing
             skewing it has been taken out.

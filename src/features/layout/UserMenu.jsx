@@ -27,7 +27,7 @@ export const ROLE_META = {
     icon: Briefcase,
     chip: "border-fair/35 bg-fair/12 text-fair",
     dot: "bg-fair",
-    avatar: "bg-fair text-white",
+    avatar: "bg-fair text-ink-950",
   },
   applicant: {
     label: "Applicant",

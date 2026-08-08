@@ -40,8 +40,8 @@ const SEVERITY_BAR = {
   critical: "bg-risk",
   high: "bg-risk",
   medium: "bg-raw",
-  low: "bg-sky-500",
-  info: "bg-slate-300",
+  low: "bg-brand",
+  info: "bg-mist-500",
 };
 
 function relativeTime(date) {
@@ -185,7 +185,7 @@ export default function NotificationBell({ onNavigate }) {
 
             {riskAlerts.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 bg-risk/12/70 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-risk">
+                <div className="flex items-center gap-2 bg-risk/18 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-risk">
                   <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                   Top {riskAlerts.length} attrition risk
                 </div>
@@ -223,8 +223,8 @@ function NotificationRow({ notification, onClick, onDismiss, showRank }) {
       type="button"
       onClick={() => onClick(notification)}
       className={cx(
-        "group relative flex w-full items-start gap-3 border-b border-slate-50 px-4 py-3 text-left transition last:border-0",
-        notification.read ? "bg-ink-800 hover:bg-ink-750" : "bg-brand/12/40 hover:bg-brand/12/70"
+        "group relative flex w-full items-start gap-3 border-b border-ink-700 px-4 py-3 text-left transition last:border-0",
+        notification.read ? "bg-ink-800 hover:bg-ink-750" : "bg-brand/10 hover:bg-brand/18"
       )}
     >
       <span

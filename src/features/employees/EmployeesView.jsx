@@ -586,7 +586,7 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
     const planNames = ["Plan A", "Plan B", "Plan C"];
     const planTagColors = [
       "bg-brand/12 text-brand-hi border-brand/35",
-      "bg-sky-50 text-sky-700 border-sky-200",
+      "bg-fair/12 text-fair border-fair/35",
       "bg-brand/12 text-brand-hi border-brand/35",
     ];
 
@@ -1081,7 +1081,7 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
                                           onClick={() => handleApplyIntervention(chg, plan)}
                                           disabled={applying !== null}
                                           title="Write this change to MongoDB and re-run the attrition model"
-                                          className="inline-flex shrink-0 items-center gap-1.5 rounded-tile bg-ink-850 px-3 py-1.5 text-[11px] font-bold text-paper transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                          className="inline-flex shrink-0 items-center gap-1.5 rounded-tile bg-ink-850 px-3 py-1.5 text-[11px] font-bold text-paper transition hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                           {isApplying ? (
                                             <>
@@ -1130,7 +1130,9 @@ function EmployeesView({ employees, search, setSearch, focusId = null, onEmploye
     <div className="space-y-7">
       <PageIntro
         kicker="Retention"
+        eyebrowStyle="serif"
         title="Who is most likely to leave"
+        accentWord="leave"
         lede="Every person scored by the model, with the counterfactual plans that would move the number. Open anyone to see what changes it and by how much."
       />
 

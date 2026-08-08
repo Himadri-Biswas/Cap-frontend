@@ -100,7 +100,7 @@ export default function CvLibrary({ cvs = [], onChange, compact = false, uploadO
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-tile border border-dashed border-ink-500 bg-ink-800 px-4 py-2.5 text-sm font-semibold text-mist-200 transition hover:border-brand/35 hover:bg-brand/12/40 disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-tile border border-dashed border-ink-500 bg-ink-800 px-4 py-2.5 text-sm font-semibold text-mist-200 transition hover:border-brand/35 hover:bg-brand/10 disabled:opacity-60"
         >
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
           {uploading ? `Uploading${progress ? ` ${progress}` : ""}…` : "Upload a different CV"}
@@ -110,7 +110,7 @@ export default function CvLibrary({ cvs = [], onChange, compact = false, uploadO
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex w-full flex-col items-center justify-center rounded-tile border border-dashed border-ink-500 bg-ink-850 px-6 py-10 transition hover:border-brand/35 hover:bg-brand/12/40 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full flex-col items-center justify-center rounded-tile border border-dashed border-ink-500 bg-ink-850 px-6 py-10 transition hover:border-brand/35 hover:bg-brand/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-tile bg-brand/12 text-brand-hi">
             {uploading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Upload className="h-5 w-5" aria-hidden="true" />}
@@ -132,7 +132,7 @@ export default function CvLibrary({ cvs = [], onChange, compact = false, uploadO
                   key={cv.fileId}
                   className={cx(
                     "rounded-tile border p-3 transition",
-                    cv.isDefault ? "border-brand/35 bg-brand/12/50" : "border-ink-600 bg-ink-800"
+                    cv.isDefault ? "border-brand/35 bg-brand/18" : "border-ink-600 bg-ink-800"
                   )}
                 >
                   <div className="flex items-start gap-3">
@@ -217,7 +217,7 @@ export default function CvLibrary({ cvs = [], onChange, compact = false, uploadO
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-tile border border-dashed border-ink-500 bg-ink-800 px-4 py-2.5 text-sm font-semibold text-mist-200 transition hover:border-brand/35 hover:bg-brand/12/40 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-tile border border-dashed border-ink-500 bg-ink-800 px-4 py-2.5 text-sm font-semibold text-mist-200 transition hover:border-brand/35 hover:bg-brand/10 disabled:opacity-60"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
             {uploading ? `Uploading${progress ? ` ${progress}` : ""}…` : "Add another CV"}

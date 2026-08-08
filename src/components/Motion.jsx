@@ -1,5 +1,6 @@
 import React from "react";
 import { motion, useReducedMotion, useScroll, useSpring } from "framer-motion";
+import { cx } from "../lib/cx.js";
 
 /**
  * Motion primitives.
@@ -46,7 +47,7 @@ export function Reveal({ children, delay = 0, y = 14, className = "", as = "sect
       initial={still ? false : { opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: still ? 0 : 0.45, ease: EASE, delay: still ? 0 : delay }}
+      transition={{ duration: still ? 0 : 0.6, ease: EASE, delay: still ? 0 : delay }}
     >
       {children}
     </Component>
@@ -126,20 +127,43 @@ export function CountUp({ value, decimals = 0, suffix = "", className = "" }) {
 /**
  * Text that assembles itself as it scrolls into view.
  *
- * The string is split on spaces and each word rises independently with a
- * short stagger, so a headline reads as it lands rather than appearing all at
- * once. Words, not characters — per-character animation on a real sentence is
- * showy and slows the reader down.
+ * The string is split on spaces and each word rises independently on a
+ * calm, unhurried stagger — closer to how Linear’s own copy lands (each
+ * word settling in turn, never a flurry) than a typing effect. Words, not
+ * characters — per-character animation on a real sentence is showy and
+ * slows the reader down.
+ *
+ * `accentWord` picks exactly one word out of the sentence to set in the
+ * curved serif italic instead of the display face — the one stylistic
+ * departure this product allows itself, used once per heading at most.
+ * Matching is case-insensitive and ignores trailing punctuation, so
+ * accentWord="correct" also matches "correct." at a sentence's end.
+ *
+ * `blur` layers a soft focus-pull on top of the rise — reserved for the
+ * one or two hero headings per page. Used everywhere it stops reading as
+ * intentional and starts reading as a template effect.
  *
  * The whole string stays in the DOM as one accessible label; the spans are
- * hidden from assistive tech so a screen reader hears a sentence, not a list
- * of words.
+ * hidden from assistive tech so a screen reader hears a sentence, not a
+ * list of words.
  */
-export function TextReveal({ text, className = "", as: Tag = "h2", delay = 0, stagger = 0.028 }) {
+export function TextReveal({
+  text,
+  className = "",
+  as: Tag = "h2",
+  delay = 0,
+  stagger = 0.052,
+  accentWord,
+  accentClassName = "",
+  blur = false,
+}) {
   const still = useReducedMotion();
   if (still) return <Tag className={className}>{text}</Tag>;
 
   const words = String(text).split(" ");
+  const accentKey = accentWord?.toLowerCase();
+  const hiddenState = blur ? { y: "100%", filter: "blur(9px)" } : { y: "105%" };
+
   return (
     <Tag className={className} aria-label={text}>
       <motion.span
@@ -150,23 +174,30 @@ export function TextReveal({ text, className = "", as: Tag = "h2", delay = 0, st
         variants={{ shown: { transition: { staggerChildren: stagger, delayChildren: delay } } }}
         style={{ display: "inline" }}
       >
-        {words.map((word, i) => (
-          // The clipping wrapper is what makes the word rise out of the line
-          // rather than fade in place.
-          <span key={i} style={{ display: "inline-block", overflow: "hidden", verticalAlign: "bottom" }}>
-            <motion.span
-              style={{ display: "inline-block" }}
-              variants={{
-                hidden: { y: "105%" },
-                shown: { y: 0, transition: { duration: 0.6, ease: EASE } },
-              }}
-            >
-              {word}
-              {/* A hard space — inline-block words drop an ordinary one. */}
-              {i < words.length - 1 ? " " : ""}
-            </motion.span>
-          </span>
-        ))}
+        {words.map((word, i) => {
+          const isAccent = accentKey && word.toLowerCase().replace(/[.,!?]+$/, "") === accentKey;
+          return (
+            // The clipping wrapper is what makes the word rise out of the
+            // line rather than fade in place. The space is a sibling of the
+            // wrapper, not content inside it — a space at the edge of an
+            // inline-block's own line box gets collapsed away by the browser,
+            // which is what was running every word together.
+            <React.Fragment key={i}>
+              <span style={{ display: "inline-block", overflow: "hidden", verticalAlign: "bottom" }}>
+                <motion.span
+                  style={{ display: "inline-block" }}
+                  variants={{
+                    hidden: hiddenState,
+                    shown: { y: 0, filter: "blur(0px)", transition: { duration: blur ? 0.85 : 0.7, ease: EASE } },
+                  }}
+                >
+                  {isAccent ? <em className={cx("accent", accentClassName)}>{word}</em> : word}
+                </motion.span>
+              </span>
+              {i < words.length - 1 ? " " : ""}
+            </React.Fragment>
+          );
+        })}
       </motion.span>
     </Tag>
   );

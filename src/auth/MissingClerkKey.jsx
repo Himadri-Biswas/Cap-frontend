@@ -3,7 +3,7 @@ import React from "react";
 /** Shown when VITE_CLERK_PUBLISHABLE_KEY is absent, instead of a blank page. */
 export default function MissingClerkKey() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F7F9FC] p-4">
+    <div className="grain flex min-h-screen items-center justify-center bg-ink-900 p-4">
       <div className="w-full max-w-2xl rounded-panel border border-raw/35 bg-ink-800 p-8">
         <div className="text-xs font-semibold uppercase tracking-[0.2em] text-raw">Setup required</div>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-paper">
@@ -15,7 +15,7 @@ export default function MissingClerkKey() {
           restart the dev server.
         </p>
 
-        <pre className="mt-5 overflow-x-auto rounded-tile bg-ink-850 p-4 text-xs leading-6 text-mist-100">
+        <pre className="mt-5 overflow-x-auto rounded-tile bg-ink-850 p-4 text-xs leading-6 text-paper">
 {`VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxx
 CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxx
 MONGO_URI="mongodb+srv://user:pass@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority"

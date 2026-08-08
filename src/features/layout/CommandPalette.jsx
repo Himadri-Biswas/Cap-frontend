@@ -145,7 +145,7 @@ export default function CommandPalette({ open, onClose, onNavigate, jobs = [], e
         aria-hidden="true"
         tabIndex={-1}
         onClick={onClose}
-        className="fixed inset-0 cursor-default bg-[#0d1017]/50 backdrop-blur-[3px] animate-[fade_160ms_ease-out]"
+        className="fixed inset-0 cursor-default bg-ink-950/75 backdrop-blur-[3px] animate-[fade_160ms_ease-out]"
       />
 
       <div

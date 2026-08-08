@@ -120,7 +120,7 @@ function SimpleDashboard({ jobs = [], employees = [], onNavigate }) {
             <button
               type="button"
               onClick={() => onNavigate?.("employees")}
-              className="mt-6 inline-flex items-center gap-2 rounded-tile bg-white px-4 py-2.5 text-sm font-semibold text-[#101319] transition hover:bg-white/90"
+              className="mt-6 inline-flex items-center gap-2 rounded-tile bg-paper px-4 py-2.5 text-sm font-semibold text-ink-950 transition-colors hover:bg-white"
             >
               Review at-risk employees
               <ArrowUpRight className="h-4 w-4" aria-hidden="true" />

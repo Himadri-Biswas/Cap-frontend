@@ -160,7 +160,7 @@ export default function PeopleView({ search = "" }) {
           <Pill className="border border-ink-600 bg-ink-750 text-mist-200">{total} accounts</Pill>
         </div>
 
-        <div className="mt-3 rounded-tile border border-indigo-100 bg-brand/12/60 px-4 py-3 text-xs leading-5 text-indigo-900">
+        <div className="mt-3 rounded-tile border border-brand/25 bg-brand/8 px-4 py-3 text-xs leading-5 text-mist-200">
           <span className="font-semibold">How roles work.</span> Everyone signs in through the same portal and
           starts as an <span className="font-semibold">applicant</span>. Granting a role adds it — nobody loses
           their existing access, so a current employee can still apply for other jobs from the same account.
@@ -351,7 +351,7 @@ export default function PeopleView({ search = "" }) {
                             "inline-flex shrink-0 items-center gap-1.5 rounded-tile px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-50",
                             held
                               ? "border border-risk/35 bg-risk/12 text-risk hover:bg-risk/12"
-                              : "bg-ink-850 text-paper hover:bg-slate-800"
+                              : "bg-ink-850 text-paper hover:bg-ink-700"
                           )}
                         >
                           {busy ? (
@@ -422,7 +422,7 @@ export default function PeopleView({ search = "" }) {
                         key={emp.EmployeeNumber}
                         onClick={() => setLinkChoice(emp)}
                         className={cx(
-                          "flex w-full items-center justify-between gap-2 border-b border-slate-50 px-3 py-2 text-left text-xs transition last:border-0",
+                          "flex w-full items-center justify-between gap-2 border-b border-ink-700 px-3 py-2 text-left text-xs transition last:border-0",
                           linkChoice?.EmployeeNumber === emp.EmployeeNumber
                             ? "bg-ok/12"
                             : "hover:bg-ink-750"

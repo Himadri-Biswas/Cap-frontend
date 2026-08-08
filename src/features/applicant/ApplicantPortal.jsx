@@ -41,7 +41,7 @@ import { useSession } from "../../auth/SessionProvider.jsx";
 
 const STATUS_STYLE = {
   submitted: { cls: "border-ink-600 bg-ink-750 text-mist-400", label: "Submitted" },
-  under_review: { cls: "border-sky-200 bg-sky-50 text-sky-700", label: "Under review" },
+  under_review: { cls: "border-brand/35 bg-brand/12 text-brand-hi", label: "Under review" },
   shortlisted: { cls: "border-ok/35 bg-ok/12 text-ok", label: "Shortlisted" },
   interview: { cls: "border-brand/35 bg-brand/12 text-brand-hi", label: "Interview" },
   offered: { cls: "border-brand/35 bg-brand/12 text-brand-hi", label: "Offer" },
@@ -327,7 +327,7 @@ export default function ApplicantPortal() {
                 <div className="mt-3 space-y-2">
                   {detail.statusHistory.map((h, i) => (
                     <div key={i} className="flex items-center gap-3 text-xs">
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-400" />
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-brand-hi" />
                       <span className="font-semibold capitalize text-paper">{h.status.replace(/_/g, " ")}</span>
                       <span className="text-mist-600">{new Date(h.at).toLocaleDateString()}</span>
                       {h.note ? <span className="truncate text-mist-500">— {h.note}</span> : null}
@@ -851,7 +851,7 @@ function ApplyModal({ job, onClose, onSubmitted, user, cvs = [], onCvsChange, on
                       className={cx(
                         "flex w-full items-center gap-3 rounded-tile border p-3 text-left transition disabled:opacity-50",
                         active
-                          ? "border-brand/35 bg-brand/12/70 ring-2 ring-brand/30"
+                          ? "border-brand/35 bg-brand/18 ring-2 ring-brand/30"
                           : "border-ink-600 bg-ink-800 hover:bg-ink-750"
                       )}
                     >
