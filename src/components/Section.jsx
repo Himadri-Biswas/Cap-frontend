@@ -35,6 +35,7 @@ export default function Section({
   className = "",
   bodyClassName = "",
   tone = "panel",
+  accentWord,
 }) {
   return (
     <Reveal className={cx(tone === "bare" ? "" : "panel overflow-hidden", className)}>
@@ -62,7 +63,8 @@ export default function Section({
             <TextReveal
               as="h3"
               text={title}
-              className="title-lg h-split text-[clamp(20px,2.2vw,26px)]"
+              accentWord={accentWord}
+              className="title-lg text-[clamp(20px,2.2vw,26px)]"
             />
 
             {lede && (
@@ -83,17 +85,31 @@ export default function Section({
  * The same intro without a panel around it — for the top of a page, where the
  * heading introduces everything below rather than one block.
  */
-export function PageIntro({ kicker, title, lede, actions, className = "" }) {
+export function PageIntro({ kicker, title, lede, actions, className = "", accentWord, eyebrowStyle = "mono" }) {
   return (
     <div className={cx("flex flex-wrap items-end justify-between gap-6", className)}>
       <div className="min-w-0 max-w-2xl">
         {kicker && (
           <div className="mb-3 flex items-center gap-3">
-            <span className="num text-[10px] font-medium uppercase tracking-[0.2em] text-mist-500">{kicker}</span>
+            <span
+              className={
+                eyebrowStyle === "serif"
+                  ? "eyebrow-serif"
+                  : "num text-[10px] font-medium uppercase tracking-[0.2em] text-mist-500"
+              }
+            >
+              {kicker}
+            </span>
             <RuleIn className="h-px w-16 bg-ink-600" />
           </div>
         )}
-        <TextReveal as="h2" text={title} className="display-xl h-split text-[clamp(28px,3.6vw,42px)] text-paper" />
+        <TextReveal
+          as="h2"
+          text={title}
+          accentWord={accentWord}
+          blur
+          className="display-xl text-[clamp(28px,3.6vw,42px)] text-paper"
+        />
         {lede && <p className="mt-4 max-w-[58ch] text-[14.5px] leading-[1.7] text-mist-400">{lede}</p>}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}

@@ -356,7 +356,7 @@ export default function NewJobModal({ open, onClose, onCreated }) {
                     <button
                       type="button"
                       onClick={() => setSkills((list) => list.filter((s) => s !== skill))}
-                      className="text-indigo-400 hover:text-brand-hi"
+                      className="text-brand-hi hover:text-brand-hi"
                       title="Remove this skill"
                     >
                       <X className="h-3 w-3" aria-hidden="true" />
@@ -368,7 +368,7 @@ export default function NewJobModal({ open, onClose, onCreated }) {
           </div>
         </div>
 
-        <div className="rounded-tile border border-indigo-100 bg-brand/12/60 px-4 py-3 text-xs leading-5 text-indigo-900">
+        <div className="rounded-tile border border-brand/25 bg-brand/8 px-4 py-3 text-xs leading-5 text-mist-200">
           Publishing sets the post to <span className="font-semibold">Open</span> and visible to every applicant
           immediately. The card summary is generated from your description automatically.
         </div>

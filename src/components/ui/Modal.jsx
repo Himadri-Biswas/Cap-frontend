@@ -71,7 +71,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
         aria-hidden="true"
         tabIndex={-1}
         onClick={onClose}
-        className="fixed inset-0 cursor-default bg-[#0d1017]/45 backdrop-blur-[3px] animate-[fade_200ms_ease-out]"
+        className="fixed inset-0 cursor-default bg-ink-950/70 backdrop-blur-[3px] animate-[fade_200ms_ease-out]"
       />
 
       <div

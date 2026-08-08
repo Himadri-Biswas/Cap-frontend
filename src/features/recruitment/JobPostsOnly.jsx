@@ -655,7 +655,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
 
   const STATUS_STYLE = {
     submitted: "border-ink-600 bg-ink-750 text-mist-400",
-    under_review: "border-sky-200 bg-sky-50 text-sky-700",
+    under_review: "border-brand/35 bg-brand/12 text-brand-hi",
     shortlisted: "border-ok/35 bg-ok/12 text-ok",
     interview: "border-brand/35 bg-brand/12 text-brand-hi",
     offered: "border-brand/35 bg-brand/12 text-brand-hi",
@@ -669,7 +669,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
     <div className="rounded-panel border border-ink-600 bg-ink-800 p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-tile to-cyan-400 text-paper">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-tile bg-brand text-white">
             <Plus className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
@@ -946,7 +946,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                     className={cx(
                       "rounded-tile border p-3 text-left transition",
                       isActive
-                        ? "border-brand/35 bg-brand/12/80 ring-2 ring-brand/30"
+                        ? "border-brand/35 bg-brand/18 ring-2 ring-brand/30"
                         : "border-ink-600 bg-ink-800 hover:bg-ink-750"
                     )}
                   >
@@ -978,7 +978,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
             lede={`${activeSplit.cvItems.length} skill${activeSplit.cvItems.length === 1 ? "" : "s"} read out of this CV.`}
           >
             <div className="grid gap-3 lg:grid-cols-3">
-              <div className="rounded-tile border border-ok/35 bg-ok/12/40 p-4">
+              <div className="rounded-tile border border-ok/35 bg-ok/10 p-4">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-bold text-ok">Matched</span>
                   <span className="font-mono text-sm font-bold text-ok">{activeSplit.matched.length}</span>
@@ -993,7 +993,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                 </div>
               </div>
 
-              <div className="rounded-tile border border-risk/35 bg-risk/12/40 p-4">
+              <div className="rounded-tile border border-risk/35 bg-risk/10 p-4">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-bold text-risk">Missing</span>
                   <span className="font-mono text-sm font-bold text-risk">{activeSplit.missing.length}</span>
@@ -1261,6 +1261,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
           step={4}
           kicker="Residual"
           title="What is left after debiasing"
+          accentWord="left"
           lede="The same four factors measured again on the corrected model. The closer every figure sits to zero, the less a background still moves a score."
         >
           <ScrollTable tone="fair">
@@ -1307,6 +1308,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
           step={5}
           kicker="Per person"
           title="The same story, one candidate at a time"
+          accentWord="story"
           lede="Every factor for every person, with a plain sentence under each table stating what actually happened to them."
         >
           <PagedList
@@ -1561,32 +1563,32 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                   <span className="font-mono font-semibold text-paper">{formatScore(before.score_spread)}</span>, and
                   part of that came from university, gender, skin colour and ethnicity rather than the CVs. After
                   debiasing it is{" "}
-                  <span className="font-mono font-semibold text-emerald-400">{formatScore(after.score_spread)}</span>.
+                  <span className="font-mono font-semibold text-fair">{formatScore(after.score_spread)}</span>.
                   So {improvement.spread_reduction_pct ?? 0}% of the gap was background, not skills.
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="feature-well px-4 py-3">
-                  <div className="text-[11px] font-medium text-mist-600">Gained the most</div>
+                  <div className="text-[11px] font-medium feature-faint">Gained the most</div>
                   <div className="mt-1 text-sm font-semibold text-white">{improvement.most_improved || "—"}</div>
-                  <div className="mt-0.5 text-[11px] text-mist-600">was losing the most points</div>
+                  <div className="mt-0.5 text-[11px] feature-faint">was losing the most points</div>
                 </div>
                 <div className="feature-well px-4 py-3">
-                  <div className="text-[11px] font-medium text-mist-600">Came down the most</div>
+                  <div className="text-[11px] font-medium feature-faint">Came down the most</div>
                   <div className="mt-1 text-sm font-semibold text-white">{improvement.most_corrected || "—"}</div>
-                  <div className="mt-0.5 text-[11px] text-mist-600">was gaining the most points</div>
+                  <div className="mt-0.5 text-[11px] feature-faint">was gaining the most points</div>
                 </div>
                 <div className="feature-well px-4 py-3">
-                  <div className="text-[11px] font-medium text-mist-600">Over the bar before</div>
+                  <div className="text-[11px] font-medium feature-faint">Over the bar before</div>
                   <div className="num mt-1 text-xl font-bold text-white">
                     {before.shortlisted_count ?? 0}
                     <span className="ml-1 text-sm font-normal feature-faint">/ {summary.total_candidates ?? candidates.length}</span>
                   </div>
                 </div>
                 <div className="feature-well px-4 py-3">
-                  <div className="text-[11px] font-medium text-mist-600">Over the bar after</div>
-                  <div className="mt-1 text-xl font-bold text-emerald-400">
+                  <div className="text-[11px] font-medium feature-faint">Over the bar after</div>
+                  <div className="mt-1 text-xl font-bold text-fair">
                     {after.shortlisted_count ?? 0}
                     <span className="ml-1 text-sm font-normal feature-faint">/ {summary.total_candidates ?? candidates.length}</span>
                   </div>
@@ -1640,8 +1642,8 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                   ].map((row) => (
                     <tr key={row.label} className="border-t border-ink-500/10">
                       <td className="font-medium text-white">{row.label}</td>
-                      <td className="text-right font-mono text-amber-300">{formatScore(row.before)}</td>
-                      <td className="text-right font-mono font-semibold text-emerald-400">
+                      <td className="text-right font-mono text-raw">{formatScore(row.before)}</td>
+                      <td className="text-right font-mono font-semibold text-fair">
                         {formatScore(row.after)}
                       </td>
                       <td className="text-xs leading-5 text-mist-600">{row.note}</td>
@@ -1672,23 +1674,23 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                       return (
                         <tr key={f.key} className="border-t border-ink-500/10">
                           <td className="font-medium text-white">{f.label}</td>
-                          <td className="text-right font-mono text-amber-300">
+                          <td className="text-right font-mono text-raw">
                             {formatAdjustment(stats.max_bonus)}
                           </td>
-                          <td className="text-right font-mono text-rose-300">
+                          <td className="text-right font-mono text-risk">
                             {formatAdjustment(stats.max_penalty)}
                           </td>
                           <td className="text-right font-mono text-mist-700">
                             {(stats.adjustment_range ?? 0).toFixed(3)}
                           </td>
-                          <td className="text-right font-mono font-semibold text-emerald-400">
+                          <td className="text-right font-mono font-semibold text-fair">
                             {(stats.fair_score_group_spread ?? 0).toFixed(4)}
                           </td>
                           <td className="text-xs">
                             <span
                               className={cx(
                                 "rounded-full px-2 py-0.5 font-semibold",
-                                settled ? "bg-emerald-400/15 text-emerald-300" : "bg-raw/15 text-amber-300"
+                                settled ? "bg-fair/15 text-fair" : "bg-raw/15 text-raw"
                               )}
                             >
                               {settled ? "No" : "Yes, still does"}
@@ -1724,9 +1726,9 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                     className={cx(
                       "flex flex-col gap-2 rounded-tile border p-3 sm:flex-row sm:items-center sm:gap-4",
                       move > 0
-                        ? "border-ok/35 bg-ok/12/40"
+                        ? "border-ok/35 bg-ok/10"
                         : move < 0
-                          ? "border-raw/35 bg-raw/12/40"
+                          ? "border-raw/35 bg-raw/10"
                           : "border-ink-600 bg-ink-850"
                     )}
                   >
@@ -1791,11 +1793,11 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                   className={cx(
                     "relative overflow-hidden rounded-tile border p-4",
                     applicant?.tone === "positive"
-                      ? "border-ok/35 bg-ok/12/40"
+                      ? "border-ok/35 bg-ok/10"
                       : applicant?.tone === "negative"
-                        ? "border-risk/35 bg-risk/12/40"
+                        ? "border-risk/35 bg-risk/10"
                         : applicant?.tone === "mixed"
-                          ? "border-raw/35 bg-raw/12/40"
+                          ? "border-raw/35 bg-raw/10"
                           : "border-ink-600 bg-ink-800"
                   )}
                 >
@@ -1915,6 +1917,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
           <PageIntro
             kicker="Hiring"
             title="Open roles and fair screening"
+            accentWord="fair"
             lede="Post a role, collect CVs, then screen the whole batch twice — once by the original model and once with background removed — and compare the two."
           />
           <PostJobPanel />
@@ -2092,7 +2095,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                 onClick={handleScreenStoredCvs}
                 disabled={storedScreenLoading}
                 title="Send every stored CV for this job to the fair-ranking model"
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-tile bg-ink-850 px-3 py-2 text-xs font-bold text-paper transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-tile bg-ink-850 px-3 py-2 text-xs font-bold text-paper transition hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {storedScreenLoading ? (
                   <>
@@ -2213,11 +2216,11 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                   className={cx(
                     "rounded-tile border p-4",
                     selectedCandidate?.tone === "positive"
-                      ? "border-ok/35 bg-ok/12/50"
+                      ? "border-ok/35 bg-ok/18"
                       : selectedCandidate?.tone === "negative"
-                        ? "border-risk/35 bg-risk/12/50"
+                        ? "border-risk/35 bg-risk/18"
                         : selectedCandidate?.tone === "mixed"
-                          ? "border-raw/35 bg-raw/12/50"
+                          ? "border-raw/35 bg-raw/18"
                           : "border-ink-600 bg-ink-850"
                   )}
                 >

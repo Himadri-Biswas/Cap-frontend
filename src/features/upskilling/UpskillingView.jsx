@@ -34,7 +34,7 @@ const CRITICALITY_TONE = {
   required: "border-risk/35 bg-risk/12 text-risk",
   strong: "border-ink-500 bg-ink-750 text-mist-200",
   preferred: "border-raw/35 bg-raw/12 text-raw",
-  nice_to_have: "border-sky-200 bg-sky-50 text-sky-700",
+  nice_to_have: "border-brand/35 bg-brand/12 text-brand-hi",
   optional: "border-ink-600 bg-ink-850 text-mist-400",
   inferred: "border-ink-600 bg-ink-850 text-mist-400",
 };
@@ -214,29 +214,35 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
               )}
             </div>
 
-            <div className="mt-3 inline-flex rounded-tile border border-brand/35 to-violet-50 p-1">
+            {/* A segmented control needs its active state to be UNMISTAKABLE —
+                this one used to rely on gradient stops with no direction
+                utility attached, so "active" and "inactive" rendered
+                identically. Solid fills instead. */}
+            <div className="mt-3 inline-flex gap-1 rounded-tile border border-ink-600 bg-ink-850 p-1">
               <button
+                type="button"
                 onClick={() => {
                   setJobMode("select");
                   setCustomJobChecked(false);
                   resetResult();
                 }}
                 className={cx(
-                  "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
-                  jobMode === "select" ? "  to-violet-500 text-paper " : "text-mist-200 hover:bg-ink-800/70"
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                  jobMode === "select" ? "bg-brand text-white" : "text-mist-400 hover:bg-ink-800 hover:text-paper"
                 )}
               >
                 Select Job
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setJobMode("custom");
                   setTargetJobId(null);
                   resetResult();
                 }}
                 className={cx(
-                  "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
-                  jobMode === "custom" ? " from-cyan-500 to-blue-500 text-paper " : "text-mist-200 hover:bg-ink-800/70"
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                  jobMode === "custom" ? "bg-fair text-ink-950" : "text-mist-400 hover:bg-ink-800 hover:text-paper"
                 )}
               >
                 Custom Job
@@ -257,7 +263,7 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                       className={cx(
                         "w-full rounded-tile border p-4 text-left transition duration-150",
                         active
-                          ? "border-brand/35    ring-2 ring-indigo-100 "
+                          ? "border-brand/45 bg-brand/8 ring-2 ring-brand/25"
                           : "border-ink-600 bg-ink-800 hover:border-ink-400 hover:bg-ink-750"
                       )}
                     >
@@ -319,7 +325,7 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                     className={cx(
                       "rounded-tile border p-3 text-left transition duration-150",
                       active
-                        ? "border-brand/35    ring-2 ring-indigo-100 "
+                        ? "border-brand/45 bg-brand/8 ring-2 ring-brand/25"
                         : "border-ink-600 bg-ink-800 hover:border-ink-400 hover:bg-ink-750"
                     )}
                   >
@@ -330,12 +336,12 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-paper">{e.name}</div>
                         <div className="mt-1">
-                          <span className="inline-flex max-w-full truncate rounded-full border border-sky-100 bg-sky-50 px-2.5 py-0.5 text-[11px] font-medium text-sky-700">
+                          <span className="inline-flex max-w-full truncate rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5 text-[11px] font-medium text-brand-hi">
                             {e.JobRole}
                           </span>
                         </div>
                         <div className="mt-1 flex items-center gap-2">
-                          <span className="rounded-full border border-emerald-100 bg-ok/12 px-2 py-0.5 text-[11px] font-medium text-ok">
+                          <span className="rounded-full border border-ok/30 bg-ok/12 px-2 py-0.5 text-[11px] font-medium text-ok">
                             {e.Department}
                           </span>
                         </div>
@@ -411,12 +417,12 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
             </div>
 
             {error && (
-              <div className="mb-4 flex items-start gap-2 rounded-tile border border-risk/35 from-rose-50 to-white p-4">
+              <div className="mb-4 flex items-start gap-2 rounded-tile border border-risk/35 bg-risk/8 p-4">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-risk" aria-hidden="true" />
                 <div>
                   <div className="text-sm font-semibold text-risk">Learning path generation failed</div>
                   <div className="mt-1 text-sm text-risk">{error}</div>
-                  <div className="mt-1 text-xs text-rose-400">API: {MODULE2_API_URL}</div>
+                  <div className="mt-1 text-xs text-risk/80">API: {MODULE2_API_URL}</div>
                 </div>
               </div>
             )}
@@ -576,7 +582,7 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                             <div className="h-7 w-7 rounded-full border border-brand/35 bg-brand/12 text-brand-hi text-xs font-bold flex items-center justify-center">
                               {idx + 1}
                             </div>
-                            {idx < learningPath.length - 1 && <div className="mt-1 w-px flex-1 bg-slate-300" />}
+                            {idx < learningPath.length - 1 && <div className="mt-1 w-px flex-1 bg-ink-500" />}
                           </div>
                           <div className="flex-1 rounded-tile border border-ink-600 bg-ink-800 px-3 py-2">
                             <div className="flex items-center justify-between gap-2">

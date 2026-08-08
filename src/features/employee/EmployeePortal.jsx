@@ -87,7 +87,7 @@ export default function EmployeePortal() {
         >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-tile from-emerald-500 to-teal-600 font-black text-paper">
+              <div className="flex h-11 w-11 items-center justify-center rounded-tile bg-fair font-black text-ink-950">
                 {profile?.initials || "HR"}
               </div>
               <div>

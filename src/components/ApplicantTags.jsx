@@ -22,7 +22,7 @@ export const TAG_META = {
     tone: "positive",
     className: "border-ok/35 bg-ok/12 text-ok",
     solid: "border-ok/35 bg-ok/12 text-ok",
-    ring: "ring-emerald-200",
+    ring: "ring-ok/35",
     description: "Worked here before and left in good standing.",
   },
   internal_candidate: {
@@ -30,9 +30,9 @@ export const TAG_META = {
     short: "Internal",
     icon: BadgeCheck,
     tone: "positive",
-    className: "border-sky-200 bg-sky-50 text-sky-700",
-    solid: "border-sky-300 bg-sky-100 text-sky-800",
-    ring: "ring-sky-200",
+    className: "border-brand/35 bg-brand/12 text-brand-hi",
+    solid: "border-brand/45 bg-brand/18 text-brand-hi",
+    ring: "ring-brand/35",
     description: "Currently employed here and applying for a different role.",
   },
   previously_rejected: {
@@ -42,7 +42,7 @@ export const TAG_META = {
     tone: "negative",
     className: "border-risk/35 bg-risk/12 text-risk",
     solid: "border-risk/35 bg-risk/12 text-risk",
-    ring: "ring-rose-200",
+    ring: "ring-risk/35",
     description: "Applied before and was rejected, now applying again.",
   },
   rehire_ineligible: {
@@ -51,8 +51,8 @@ export const TAG_META = {
     icon: Ban,
     tone: "negative",
     className: "border-risk/35 bg-risk/12 text-risk",
-    solid: "border-risk/35 bg-rose-200 text-risk",
-    ring: "ring-rose-300",
+    solid: "border-risk/45 bg-risk/20 text-risk",
+    ring: "ring-risk/45",
     description: "Left the company and was flagged as not eligible for rehire.",
   },
   repeat_applicant: {
@@ -84,9 +84,9 @@ export function tagTone(tags = []) {
 }
 
 export const TONE_ROW_CLASS = {
-  positive: "bg-ok/12/40 hover:bg-ok/12/70",
-  negative: "bg-risk/12/40 hover:bg-risk/12/70",
-  mixed: "bg-raw/12/40 hover:bg-raw/12/70",
+  positive: "bg-ok/10 hover:bg-ok/18",
+  negative: "bg-risk/10 hover:bg-risk/18",
+  mixed: "bg-raw/10 hover:bg-raw/18",
   neutral: "hover:bg-ink-750",
 };
 
