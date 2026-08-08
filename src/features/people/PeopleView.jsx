@@ -133,7 +133,7 @@ export default function PeopleView({ search = "" }) {
   return (
     <div className="space-y-4">
       {/* Summary + filters */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-panel border border-ink-600 bg-ink-800 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {ROLE_FILTERS.map(({ key, label, icon: Icon }) => (
@@ -141,26 +141,26 @@ export default function PeopleView({ search = "" }) {
                 key={key || "all"}
                 onClick={() => setRoleFilter(key)}
                 className={cx(
-                  "inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium transition",
+                  "inline-flex items-center gap-2 rounded-tile border px-3 py-2 text-sm font-medium transition",
                   roleFilter === key
-                    ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    ? "border-brand/35 bg-brand/12 text-brand-hi"
+                    : "border-ink-600 bg-ink-800 text-mist-200 hover:bg-ink-750"
                 )}
               >
                 <Icon className="h-4 w-4" />
                 {label}
                 {key && counts[key] > 0 ? (
-                  <span className="rounded-full bg-slate-100 px-1.5 text-[10px] font-bold text-slate-600">
+                  <span className="rounded-full bg-ink-750 px-1.5 text-[10px] font-bold text-mist-400">
                     {counts[key]}
                   </span>
                 ) : null}
               </button>
             ))}
           </div>
-          <Pill className="border border-slate-200 bg-slate-100 text-slate-700">{total} accounts</Pill>
+          <Pill className="border border-ink-600 bg-ink-750 text-mist-200">{total} accounts</Pill>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-xs leading-5 text-indigo-900">
+        <div className="mt-3 rounded-tile border border-indigo-100 bg-brand/12/60 px-4 py-3 text-xs leading-5 text-indigo-900">
           <span className="font-semibold">How roles work.</span> Everyone signs in through the same portal and
           starts as an <span className="font-semibold">applicant</span>. Granting a role adds it — nobody loses
           their existing access, so a current employee can still apply for other jobs from the same account.
@@ -171,31 +171,31 @@ export default function PeopleView({ search = "" }) {
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-3xl border border-rose-200 bg-rose-50 p-4">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
-          <div className="text-sm text-rose-700">{error}</div>
+        <div className="flex items-start gap-2 rounded-panel border border-risk/35 bg-risk/12 p-4">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-risk" aria-hidden="true" />
+          <div className="text-sm text-risk">{error}</div>
         </div>
       )}
 
       {/* People table */}
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-panel border border-ink-600 bg-ink-800">
         {loading ? (
-          <div className="flex items-center justify-center gap-2 p-12 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading people…
+          <div className="flex items-center justify-center gap-2 p-12 text-sm text-mist-500">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading people…
           </div>
         ) : users.length === 0 ? (
           <div className="p-12 text-center">
-            <UsersRound className="mx-auto h-10 w-10 text-slate-300" />
-            <div className="mt-3 text-sm font-semibold text-slate-700">No accounts yet</div>
-            <div className="mt-1 text-xs text-slate-500">
+            <UsersRound className="mx-auto h-10 w-10 text-mist-700" aria-hidden="true" />
+            <div className="mt-3 text-sm font-semibold text-mist-200">No accounts yet</div>
+            <div className="mt-1 text-xs text-mist-500">
               Accounts appear here the first time someone signs in through Clerk.
             </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead className="bg-slate-50 text-left">
-                <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <table className="data-table w-full min-w-[720px]">
+              <thead className="bg-ink-850 text-left">
+                <tr className="text-xs font-semibold uppercase tracking-wider text-mist-500">
                   <th className="px-4 py-3">Person</th>
                   <th className="px-4 py-3">Roles</th>
                   <th className="px-4 py-3">Employee record</th>
@@ -205,27 +205,27 @@ export default function PeopleView({ search = "" }) {
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.clerkUserId} className="border-t border-slate-100 hover:bg-slate-50/60">
+                  <tr key={u.clerkUserId} className="border-t border-ink-700 hover:bg-ink-750/60">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div
                           className={cx(
-                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-xs font-bold text-white",
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full  text-xs font-bold text-paper",
                             ROLE_META[u.activeRole]?.avatar || ROLE_META.applicant.avatar
                           )}
                         >
                           {(u.fullName || u.email).slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="truncate font-semibold text-slate-900">
+                          <div className="truncate font-semibold text-paper">
                             {u.fullName || u.email.split("@")[0]}
                             {u.clerkUserId === me?.clerkUserId && (
-                              <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                              <span className="ml-2 rounded-full bg-ink-750 px-1.5 py-0.5 text-[10px] font-bold text-mist-500">
                                 you
                               </span>
                             )}
                           </div>
-                          <div className="truncate text-xs text-slate-500">{u.email}</div>
+                          <div className="truncate text-xs text-mist-500">{u.email}</div>
                         </div>
                       </div>
                     </td>
@@ -249,14 +249,14 @@ export default function PeopleView({ search = "" }) {
                         })}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-600">
+                    <td className="px-4 py-3 text-xs text-mist-400">
                       {u.employeeNumber ? (
                         <>
-                          <span className="font-semibold text-slate-800">#{u.employeeNumber}</span>
-                          {u.jobTitle ? <div className="truncate text-slate-500">{u.jobTitle}</div> : null}
+                          <span className="font-semibold text-paper">#{u.employeeNumber}</span>
+                          {u.jobTitle ? <div className="truncate text-mist-500">{u.jobTitle}</div> : null}
                         </>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-mist-600">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -264,8 +264,8 @@ export default function PeopleView({ search = "" }) {
                         className={cx(
                           "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold capitalize",
                           u.status === "active"
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-rose-200 bg-rose-50 text-rose-700"
+                            ? "border-ok/35 bg-ok/12 text-ok"
+                            : "border-risk/35 bg-risk/12 text-risk"
                         )}
                       >
                         {u.status}
@@ -279,7 +279,7 @@ export default function PeopleView({ search = "" }) {
                           setLinkChoice(null);
                           setLinkQuery("");
                         }}
-                        className="rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        className="rounded-tile border border-ink-600 bg-ink-800 px-3 py-1.5 text-xs font-semibold text-mist-200 hover:bg-ink-750"
                       >
                         Manage
                       </button>
@@ -303,14 +303,14 @@ export default function PeopleView({ search = "" }) {
         {detail && (
           <div className="space-y-5">
             {actionError && (
-              <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
-                <div className="text-sm text-rose-700">{actionError}</div>
+              <div className="flex items-start gap-2 rounded-tile border border-risk/35 bg-risk/12 p-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-risk" aria-hidden="true" />
+                <div className="text-sm text-risk">{actionError}</div>
               </div>
             )}
 
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Roles</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-mist-500">Roles</div>
               <div className="mt-2 space-y-2">
                 {["admin", "employee", "applicant"].map((role) => {
                   const meta = ROLE_META[role];
@@ -321,16 +321,16 @@ export default function PeopleView({ search = "" }) {
                     <div
                       key={role}
                       className={cx(
-                        "flex items-center gap-3 rounded-2xl border p-3",
-                        held ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white"
+                        "flex items-center gap-3 rounded-tile border p-3",
+                        held ? "border-ink-600 bg-ink-850" : "border-ink-600 bg-ink-800"
                       )}
                     >
-                      <span className={cx("flex h-9 w-9 items-center justify-center rounded-xl border", meta.chip)}>
+                      <span className={cx("flex h-9 w-9 items-center justify-center rounded-tile border", meta.chip)}>
                         <Icon className="h-4 w-4" />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-slate-900">{meta.label}</div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-sm font-semibold text-paper">{meta.label}</div>
+                        <div className="text-[11px] text-mist-500">
                           {role === "admin"
                             ? "Full access: screening, attrition, people management."
                             : role === "employee"
@@ -339,8 +339,8 @@ export default function PeopleView({ search = "" }) {
                         </div>
                       </div>
                       {locked ? (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-400">
-                          <Check className="h-3.5 w-3.5" />
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-tile border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[11px] font-semibold text-mist-600">
+                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
                           Always on
                         </span>
                       ) : (
@@ -348,18 +348,18 @@ export default function PeopleView({ search = "" }) {
                           onClick={() => changeRole(detail, role, held ? "revoke" : "grant")}
                           disabled={busy}
                           className={cx(
-                            "inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-50",
+                            "inline-flex shrink-0 items-center gap-1.5 rounded-tile px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-50",
                             held
-                              ? "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                              : "bg-slate-900 text-white hover:bg-slate-800"
+                              ? "border border-risk/35 bg-risk/12 text-risk hover:bg-risk/12"
+                              : "bg-ink-850 text-paper hover:bg-slate-800"
                           )}
                         >
                           {busy ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                           ) : held ? (
-                            <X className="h-3.5 w-3.5" />
+                            <X className="h-3.5 w-3.5" aria-hidden="true" />
                           ) : (
-                            <Check className="h-3.5 w-3.5" />
+                            <Check className="h-3.5 w-3.5" aria-hidden="true" />
                           )}
                           {held ? "Revoke" : "Grant"}
                         </button>
@@ -372,48 +372,50 @@ export default function PeopleView({ search = "" }) {
 
             {/* Employee-record picker — only meaningful before granting `employee` */}
             {!detail.roles.includes("employee") && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <div className="rounded-tile border border-ink-600 bg-ink-850 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-mist-500">
                   Link an employee record
                 </div>
-                <div className="mt-1 text-[11px] text-slate-500">
+                <div className="mt-1 text-[11px] text-mist-500">
                   Optional but recommended — this is what gives them an attrition analysis. Pick one, then press
                   Grant on "Employee" above.
                 </div>
 
-                <div className="mt-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                  <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                <div className="mt-3 flex items-center gap-2 rounded-tile border border-ink-600 bg-ink-800 px-3 py-2">
+                  <Search className="h-4 w-4 shrink-0 text-mist-600" aria-hidden="true" />
                   <input
                     value={linkQuery}
                     onChange={(e) => setLinkQuery(e.target.value)}
+                    type="search"
+                    aria-label="Search unlinked employees"
                     placeholder="Search unlinked employees by name or role…"
-                    className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent text-sm text-paper outline-none placeholder:text-mist-600"
                   />
                 </div>
 
                 {linkChoice && (
-                  <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
-                    <div className="min-w-0 text-xs text-emerald-800">
+                  <div className="mt-2 flex items-center justify-between gap-2 rounded-tile border border-ok/35 bg-ok/12 px-3 py-2">
+                    <div className="min-w-0 text-xs text-ok">
                       Selected <span className="font-bold">#{linkChoice.EmployeeNumber}</span>{" "}
                       {linkChoice.name ? `· ${linkChoice.name}` : ""}{" "}
                       {linkChoice.JobRole ? `· ${linkChoice.JobRole}` : ""}
                     </div>
                     <button
                       onClick={() => setLinkChoice(null)}
-                      className="shrink-0 rounded-lg p-1 text-emerald-600 hover:bg-emerald-100"
+                      className="shrink-0 rounded-lg p-1 text-ok hover:bg-ok/12"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </div>
                 )}
 
-                <div className="mt-2 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                <div className="mt-2 max-h-44 overflow-y-auto rounded-tile border border-ink-600 bg-ink-800">
                   {linkLoading ? (
-                    <div className="flex items-center justify-center gap-2 p-4 text-xs text-slate-500">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
+                    <div className="flex items-center justify-center gap-2 p-4 text-xs text-mist-500">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Searching…
                     </div>
                   ) : linkOptions.length === 0 ? (
-                    <div className="p-4 text-xs text-slate-500">No unlinked employee records match.</div>
+                    <div className="p-4 text-xs text-mist-500">No unlinked employee records match.</div>
                   ) : (
                     linkOptions.map((emp) => (
                       <button
@@ -422,20 +424,20 @@ export default function PeopleView({ search = "" }) {
                         className={cx(
                           "flex w-full items-center justify-between gap-2 border-b border-slate-50 px-3 py-2 text-left text-xs transition last:border-0",
                           linkChoice?.EmployeeNumber === emp.EmployeeNumber
-                            ? "bg-emerald-50"
-                            : "hover:bg-slate-50"
+                            ? "bg-ok/12"
+                            : "hover:bg-ink-750"
                         )}
                       >
                         <span className="min-w-0">
-                          <span className="block truncate font-semibold text-slate-800">
+                          <span className="block truncate font-semibold text-paper">
                             #{emp.EmployeeNumber} {emp.name || ""}
                           </span>
-                          <span className="block truncate text-slate-500">
+                          <span className="block truncate text-mist-500">
                             {emp.JobRole} · {emp.Department}
                           </span>
                         </span>
                         {linkChoice?.EmployeeNumber === emp.EmployeeNumber && (
-                          <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                          <Check className="h-3.5 w-3.5 shrink-0 text-ok" aria-hidden="true" />
                         )}
                       </button>
                     ))
@@ -445,10 +447,10 @@ export default function PeopleView({ search = "" }) {
             )}
 
             {/* Account status */}
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between gap-3 rounded-tile border border-ink-600 p-4">
               <div>
-                <div className="text-sm font-semibold text-slate-900">Account status</div>
-                <div className="text-[11px] text-slate-500">
+                <div className="text-sm font-semibold text-paper">Account status</div>
+                <div className="text-[11px] text-mist-500">
                   Suspending blocks every API call without deleting anything in Clerk.
                 </div>
               </div>
@@ -457,10 +459,10 @@ export default function PeopleView({ search = "" }) {
                 disabled={busy || detail.clerkUserId === me?.clerkUserId}
                 title={detail.clerkUserId === me?.clerkUserId ? "You cannot suspend your own account" : ""}
                 className={cx(
-                  "shrink-0 rounded-xl border px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-50",
+                  "shrink-0 rounded-tile border px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-50",
                   detail.status === "active"
-                    ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    ? "border-risk/35 bg-risk/12 text-risk hover:bg-risk/12"
+                    : "border-ok/35 bg-ok/12 text-ok hover:bg-ok/12"
                 )}
               >
                 {detail.status === "active" ? "Suspend" : "Reactivate"}
@@ -469,26 +471,26 @@ export default function PeopleView({ search = "" }) {
 
             {detail.roleHistory?.length ? (
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Role history</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-mist-500">Role history</div>
                 <div className="mt-2 space-y-1.5">
                   {[...detail.roleHistory]
                     .reverse()
                     .slice(0, 6)
                     .map((h, i) => (
-                      <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px]">
+                      <div key={i} className="rounded-tile border border-ink-600 bg-ink-850 px-3 py-2 text-[11px]">
                         <span
                           className={cx(
                             "font-bold",
-                            h.action === "granted" ? "text-emerald-700" : "text-rose-700"
+                            h.action === "granted" ? "text-ok" : "text-risk"
                           )}
                         >
                           {h.action === "granted" ? "Granted" : "Revoked"} {h.role}
                         </span>
-                        <span className="text-slate-500">
+                        <span className="text-mist-500">
                           {" "}
                           · {new Date(h.at).toLocaleDateString()} by {h.byEmail || h.by || "system"}
                         </span>
-                        {h.reason ? <div className="mt-0.5 text-slate-400">{h.reason}</div> : null}
+                        {h.reason ? <div className="mt-0.5 text-mist-600">{h.reason}</div> : null}
                       </div>
                     ))}
                 </div>

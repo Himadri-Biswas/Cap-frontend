@@ -51,18 +51,50 @@ async function extractSkillSets(jobDescription, result) {
   return { jdSkills, candidateSkills };
 }
 
-/** Writes fair-ranking results back onto the matching Application documents. */
-async function writeBackScores(result, jobId, runId) {
-  if (!jobId) return [];
+/**
+ * The ranking backend answers with `cand_1`, `cand_2`, … numbered by the order
+ * the files were posted. That index is the reliable link back to an
+ * application; the parsed `name` is not, because it comes out of the CV text
+ * and often differs from the name on the account ("Nasreen Akter" on the CV,
+ * "Nasreen Aktar" on the application), or falls back to the filename entirely.
+ */
+function candidatePosition(candidate, fallbackIndex) {
+  const match = /(\d+)\s*$/.exec(String(candidate?.id || ""));
+  return match ? Number(match[1]) - 1 : fallbackIndex;
+}
+
+/**
+ * Writes fair-ranking results back onto the matching Application documents,
+ * and stamps `applicationId` onto each candidate so the UI can line the two up
+ * without repeating the guesswork.
+ *
+ * `orderedApplications` is the application behind each posted file, in the
+ * same order. When it is supplied (the from-job path) matching is exact. The
+ * ad-hoc upload path has no such ordering, so it still falls back to the name.
+ */
+async function writeBackScores(result, jobId, runId, orderedApplications = null) {
+  const candidates = result?.candidates || [];
+  if (!jobId || !candidates.length) return [];
+
   const linked = [];
-  for (const candidate of result?.candidates || []) {
-    // Match on the name the ranking backend parsed out of the CV.
-    const name = (candidate.name || "").trim();
-    if (!name) continue;
-    const application = await Application.findOne({
-      jobId,
-      applicantName: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
-    });
+  for (const [index, candidate] of candidates.entries()) {
+    let application = null;
+
+    if (orderedApplications) {
+      const position = candidatePosition(candidate, index);
+      const expected = orderedApplications[position];
+      if (expected) application = await Application.findOne({ applicationId: expected.applicationId });
+    }
+
+    if (!application) {
+      const name = (candidate.name || "").trim();
+      if (name) {
+        application = await Application.findOne({
+          jobId,
+          applicantName: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+        });
+      }
+    }
     if (!application) continue;
 
     application.ranking = candidate;
@@ -74,6 +106,11 @@ async function writeBackScores(result, jobId, runId) {
     application.rankChange = candidate.bias_analysis?.rank_change ?? null;
     application.verdict = candidate.step2_fair?.verdict ?? null;
     await application.save();
+
+    // Travels with the response AND into the saved run, so re-opening a run
+    // later still knows which application each CV belongs to.
+    candidate.applicationId = application.applicationId;
+    candidate.applicantName = application.applicantName;
     linked.push(application.applicationId);
   }
   return linked;
@@ -171,11 +208,16 @@ router.post(
     const applications = await Application.find(filter).lean();
     if (!applications.length) throw new HttpError(400, "No submitted CVs found for this job.");
 
+    // `files` and `orderedApplications` are built together and stay index-
+    // aligned: a CV whose bytes cannot be read drops out of BOTH, which is
+    // what lets the response be mapped back by position instead of by name.
     const files = [];
+    const orderedApplications = [];
     for (const app of applications) {
       const buffer = await readCvBuffer(app.cvFileId).catch(() => null);
       if (buffer) {
         files.push({ buffer, filename: app.cvOriginalName || `${app.applicantName}.pdf`, mimeType: app.cvMimeType });
+        orderedApplications.push(app);
       }
     }
     if (!files.length) throw new HttpError(500, "Could not read any stored CVs from GridFS.");
@@ -186,7 +228,7 @@ router.post(
 
     const result = await rankCandidates({ jobTitle: job.title, jobDescription, files });
     const { jdSkills, candidateSkills } = await extractSkillSets(jobDescription, result);
-    const linkedApplicationIds = await writeBackScores(result, jobId, runId);
+    const linkedApplicationIds = await writeBackScores(result, jobId, runId, orderedApplications);
 
     await ScreeningRun.create({
       runId,

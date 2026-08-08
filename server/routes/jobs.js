@@ -23,8 +23,10 @@ router.get(
   withUser,
   asyncHandler(async (req, res) => {
     const isAdmin = !!req.user?.roles?.includes("admin");
+    // Archived postings are gone as far as both sides are concerned; the
+    // document only survives so the applications attached to it still resolve.
     const filter = isAdmin && req.query.all === "true"
-      ? {}
+      ? { status: { $ne: "archived" } }
       : { status: { $in: ["open", "closed"] }, visibleToApplicants: true };
 
     const jobs = await Job.find(filter).select(PUBLIC_FIELDS).sort({ deadlineAt: -1, createdAt: -1 }).lean();
@@ -77,7 +79,10 @@ router.get(
     if (!job) throw new HttpError(404, "Job not found.");
 
     const [y, m, d] = String(job.deadline).split("-").map(Number);
-    const closed = new Date(Date.UTC(y, m - 1, d, 23, 59, 59)).getTime() < Date.now();
+    const deadlinePassed = new Date(Date.UTC(y, m - 1, d, 23, 59, 59)).getTime() < Date.now();
+    // An admin can stop a posting before its deadline; that closes it too.
+    const stopped = job.status !== "open";
+    const closed = deadlinePassed || stopped;
 
     const cooldown = await checkCooldown({
       clerkUserId: req.user.clerkUserId,
@@ -89,8 +94,13 @@ router.get(
     res.json({
       jobId: job.id,
       closed,
+      stopped,
       allowed: !closed && cooldown.allowed,
-      reason: closed ? "This job post has closed." : cooldown.reason || null,
+      reason: stopped
+        ? "This job post is no longer accepting applications."
+        : deadlinePassed
+          ? "This job post has closed."
+          : cooldown.reason || null,
       cooldownHours: cooldown.cooldownHours,
       nextEligibleAt: cooldown.nextEligibleAt || null,
       hoursRemaining: cooldown.hoursRemaining ?? 0,
@@ -160,16 +170,115 @@ router.patch(
   })
 );
 
+/**
+ * Stop / reopen a posting.
+ *
+ * Stopping sets `status: "closed"`, which the applicant side already reads:
+ * the job stays visible but the Apply button turns into "Closed" and
+ * `/:id/eligibility` refuses. Nothing is destroyed, so it is reversible.
+ */
+router.post(
+  "/:id/stop",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const job = await Job.findOne({ id: req.params.id });
+    if (!job) throw new HttpError(404, "Job not found.");
+    job.status = "closed";
+    await job.save();
+    await AuditLog.create({
+      action: "job.stop",
+      actorUserId: req.user.clerkUserId,
+      actorEmail: req.user.email,
+      entityKind: "job",
+      entityId: job.id,
+      summary: `Stopped accepting applications for ${job.id} — ${job.title}`,
+    }).catch(() => {});
+    res.json({ job });
+  })
+);
+
+router.post(
+  "/:id/reopen",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const job = await Job.findOne({ id: req.params.id });
+    if (!job) throw new HttpError(404, "Job not found.");
+    job.status = "open";
+    job.visibleToApplicants = true;
+    await job.save();
+    await AuditLog.create({
+      action: "job.reopen",
+      actorUserId: req.user.clerkUserId,
+      actorEmail: req.user.email,
+      entityKind: "job",
+      entityId: job.id,
+      summary: `Reopened ${job.id} — ${job.title}`,
+    }).catch(() => {});
+    res.json({ job });
+  })
+);
+
+/**
+ * Delete a posting.
+ *
+ * Two guards. A posting that is still running must be stopped first, so a live
+ * role cannot vanish from under the people applying to it. And a posting that
+ * already has applications is archived rather than dropped — deleting the row
+ * would orphan those applications and blank out the applicant's own history.
+ * The response says which of the two happened.
+ */
 router.delete(
   "/:id",
   requireAdmin,
   asyncHandler(async (req, res) => {
     const job = await Job.findOne({ id: req.params.id });
     if (!job) throw new HttpError(404, "Job not found.");
-    job.status = "archived";
-    job.visibleToApplicants = false;
-    await job.save();
-    res.json({ ok: true, job });
+
+    // "Still running" means it is actually accepting applications right now.
+    // Status alone is not that test: a posting whose deadline has passed keeps
+    // `status: "open"` and reads as Closed everywhere else, so checking only
+    // the status refused to delete it while the Stop button was disabled for
+    // being closed already — no way out.
+    const [y, m, d] = String(job.deadline).split("-").map(Number);
+    const deadlinePassed =
+      y && m && d ? new Date(Date.UTC(y, m - 1, d, 23, 59, 59)).getTime() < Date.now() : false;
+
+    if (job.status === "open" && !deadlinePassed) {
+      throw new HttpError(
+        409,
+        "This job posting is still running. Stop it first, then delete it.",
+        "job_still_open"
+      );
+    }
+
+    const applicationCount = await Application.countDocuments({ jobId: job.id });
+
+    if (applicationCount > 0) {
+      job.status = "archived";
+      job.visibleToApplicants = false;
+      await job.save();
+    } else {
+      await Job.deleteOne({ id: job.id });
+    }
+
+    await AuditLog.create({
+      action: "job.delete",
+      actorUserId: req.user.clerkUserId,
+      actorEmail: req.user.email,
+      entityKind: "job",
+      entityId: job.id,
+      summary: `Deleted job ${job.id} — ${job.title}${applicationCount ? ` (archived, ${applicationCount} applications kept)` : ""}`,
+    }).catch(() => {});
+
+    res.json({
+      ok: true,
+      removed: applicationCount === 0,
+      applicationCount,
+      message:
+        applicationCount > 0
+          ? `Removed from the list. ${applicationCount} application${applicationCount > 1 ? "s were" : " was"} kept so the applicants keep their history.`
+          : "Job posting deleted.",
+    });
   })
 );
 

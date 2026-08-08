@@ -1,13 +1,15 @@
 import React from "react";
-import { Plus, Search } from "lucide-react";
-import Input from "../../components/ui/Input.jsx";
+import { Search } from "lucide-react";
 import NotificationBell from "../notifications/NotificationBell.jsx";
 import UserMenu from "./UserMenu.jsx";
+import { cx } from "../../lib/cx.js";
 
 /**
- * The static "Admin / HR Manager" block and the inert bell are now the real
- * NotificationBell and UserMenu. Every existing prop keeps its meaning, so
- * callers did not have to change.
+ * The command bar.
+ *
+ * Sticky, one row, hairline bottom. It carries where you are on the left and
+ * what you can do on the right, and the search field doubles as the visible
+ * affordance for ⌘K so the shortcut is discoverable rather than folklore.
  */
 function Topbar({
   title,
@@ -16,58 +18,68 @@ function Topbar({
   setSearch,
   placeholder,
   showSearch = true,
-  showNew = false,
-  onNew,
+  onOpenPalette,
   onNavigate,
+  actions,
 }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="text-lg font-bold tracking-tight text-slate-900">{title}</div>
-          {subtitle ? <div className="text-sm text-slate-500">{subtitle}</div> : null}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {showSearch && (
-            <div className="hidden lg:flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 w-[420px]">
-              <Search className="h-4 w-4 text-slate-500" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={placeholder || "Search..."}
-                className="border-0 bg-transparent text-slate-900 placeholder:text-slate-400 focus-visible:ring-0"
-              />
-            </div>
-          )}
-
-          {showNew && (
-            <button
-              onClick={onNew}
-              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-            >
-              <Plus className="h-4 w-4" />
-              New
-            </button>
-          )}
-
-          <NotificationBell onNavigate={onNavigate} />
-          <UserMenu />
+    <header className="sticky top-0 z-30 -mx-4 mb-6 border-b border-ink-600 bg-ink-900/85 px-4 backdrop-blur-md sm:-mx-6 sm:px-6">
+      <div className="flex h-[72px] items-center gap-3">
+        <div className="min-w-0 shrink-0">
+          <h1 className="title-lg truncate text-[22px]">{title}</h1>
+          {subtitle ? <p className="mt-0.5 truncate text-[11.5px] text-mist-500">{subtitle}</p> : null}
         </div>
 
         {showSearch && (
-          <div className="flex lg:hidden items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-            <Search className="h-4 w-4 text-slate-500" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={placeholder || "Search..."}
-              className="border-0 bg-transparent text-slate-900 placeholder:text-slate-400 focus-visible:ring-0"
-            />
+          <div className="ml-auto hidden min-w-0 flex-1 justify-end md:flex">
+            <div
+              className={cx(
+                "flex h-9 w-full max-w-sm items-center gap-2 rounded-tile border border-ink-600 bg-ink-850 px-3",
+                "transition-colors focus-within:border-brand/50"
+              )}
+            >
+              <Search className="h-3.5 w-3.5 shrink-0 text-mist-600" aria-hidden="true" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={placeholder || "Search"}
+                aria-label={placeholder || "Search"}
+                className="min-w-0 flex-1 bg-transparent text-[13px] text-paper outline-none placeholder:text-mist-600"
+              />
+            </div>
           </div>
         )}
+
+        <div className={cx("flex items-center gap-2", !showSearch && "ml-auto")}>
+          <button
+            type="button"
+            onClick={onOpenPalette}
+            aria-label="Search and jump to anything"
+            className="hidden h-9 items-center gap-2 rounded-tile border border-ink-600 bg-ink-850 px-2.5 text-mist-500 transition-colors hover:border-ink-400 hover:text-paper sm:flex"
+          >
+            <Search className="h-3.5 w-3.5" aria-hidden="true" />
+            <kbd className="num text-[10px] font-medium">⌘K</kbd>
+          </button>
+
+          {actions}
+          <NotificationBell onNavigate={onNavigate} />
+          <UserMenu />
+        </div>
       </div>
-    </div>
+
+      {showSearch && (
+        <div className="flex h-12 items-center gap-2 border-t border-ink-700 md:hidden">
+          <Search className="h-3.5 w-3.5 shrink-0 text-mist-600" aria-hidden="true" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={placeholder || "Search"}
+            aria-label={placeholder || "Search"}
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-paper outline-none placeholder:text-mist-600"
+          />
+        </div>
+      )}
+    </header>
   );
 }
 

@@ -1,17 +1,17 @@
 /**
  * NewJobModal — the admin "open a job posting" form.
  *
- * This is what the Topbar's "+ New" button on the Job Recruitment screen opens.
- * It is deliberately separate from the Fair Candidate Screener panel in
- * JobPostsOnly.jsx: that panel runs an ad-hoc JD against a batch of CVs for
- * ranking and never touches the `jobs` collection. This form is what actually
- * creates a `Job` document — the thing applicants browse and apply to.
+ * This is what the "New job posting" panel opens — it sits inside the Job
+ * Recruitment screen, directly above "Latest Job Posts" (it used to be a
+ * "+ New" button in the header). This form is what creates a `Job` document,
+ * the thing applicants browse and apply to; fair screening then runs against
+ * the CVs those applicants submit.
  *
  * Required skills are NOT typed in by hand. As soon as there's enough
  * description text (typed, pasted, or pulled from an uploaded JD file), it is
  * sent to Module 1's `/extract-text` skill extractor — the exact same
- * endpoint and response shape JobPostsOnly already uses for JD skills in the
- * Fair Candidate Screener — and the result is shown as removable chips. The
+ * endpoint and response shape JobPostsOnly already uses for the JD skills in
+ * its screening results — and the result is shown as removable chips. The
  * short summary is no longer typed either: it's derived from the description
  * text at publish time.
  */
@@ -204,18 +204,18 @@ export default function NewJobModal({ open, onClose, onCreated }) {
           <button
             onClick={handleClose}
             disabled={submitting}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-tile border border-ink-600 bg-ink-800 px-4 py-2.5 text-sm font-semibold text-mist-200 hover:bg-ink-750 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="flex-1 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 rounded-tile bg-brand px-4 py-2.5 text-sm font-semibold text-paper hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (
               <span className="inline-flex items-center justify-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 Publishing…
               </span>
             ) : (
@@ -227,9 +227,9 @@ export default function NewJobModal({ open, onClose, onCreated }) {
     >
       <div className="space-y-4">
         {error && (
-          <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
-            <div className="text-sm text-rose-700">{error}</div>
+          <div className="flex items-start gap-2 rounded-tile border border-risk/35 bg-risk/12 p-3">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-risk" aria-hidden="true" />
+            <div className="text-sm text-risk">{error}</div>
           </div>
         )}
 
@@ -260,19 +260,20 @@ export default function NewJobModal({ open, onClose, onCreated }) {
 
         <div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">
               Full job description
             </span>
             <div className="flex items-center gap-2">
               {jdExtracting && (
-                <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Reading file…
+                <span className="inline-flex items-center gap-1.5 text-xs text-mist-500">
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Reading file…
                 </span>
               )}
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,.docx,.txt"
+                aria-label="Upload a job description file"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
@@ -283,26 +284,26 @@ export default function NewJobModal({ open, onClose, onCreated }) {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-tile border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-xs font-semibold text-mist-200 hover:bg-ink-750"
               >
-                <Upload className="h-3.5 w-3.5" />
+                <Upload className="h-3.5 w-3.5" aria-hidden="true" />
                 Upload JD
               </button>
             </div>
           </div>
 
           {jdFile && (
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-tile border border-ok/35 bg-ok/12 px-3 py-2 text-xs text-ok">
               <span className="inline-flex items-center gap-1.5 truncate">
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">{jdFile.name}</span>
               </span>
               <button
                 type="button"
                 onClick={() => setJdFile(null)}
-                className="shrink-0 rounded-lg p-1 text-emerald-600 hover:bg-emerald-100"
+                className="shrink-0 rounded-lg p-1 text-ok hover:bg-ok/12"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
           )}
@@ -312,32 +313,32 @@ export default function NewJobModal({ open, onClose, onCreated }) {
             value={form.description}
             onChange={(e) => set("description", e.target.value)}
             placeholder="Paste the full job description here, or upload a JD file above — skills are extracted automatically as you type."
-            className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-300"
+            className="mt-2 w-full resize-none rounded-tile border border-ink-600 bg-ink-800 px-3 py-2.5 text-sm leading-6 text-paper outline-none transition placeholder:text-mist-600 focus:border-brand/35"
           />
 
           {/* Auto-extracted skills — no manual typing, no separate box */}
-          <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="mt-2 rounded-tile border border-ink-600 bg-ink-850 p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <Sparkles className="h-3 w-3 text-indigo-500" />
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-mist-500">
+                <Sparkles className="h-3 w-3 text-brand-hi" aria-hidden="true" />
                 Required skills — extracted by Module 1
               </span>
               {skillsExtracting && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Extracting…
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-mist-600">
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Extracting…
                 </span>
               )}
             </div>
 
             {!skillsExtracting && skillsError && (
-              <div className="mt-2 text-[11px] text-amber-600">
+              <div className="mt-2 text-[11px] text-raw">
                 Skill extractor is unreachable right now. The job can still be published — skills will be
                 empty until you edit the description again while it's back up.
               </div>
             )}
 
             {!skillsExtracting && !skillsError && skills.length === 0 && (
-              <div className="mt-2 text-[11px] text-slate-400">
+              <div className="mt-2 text-[11px] text-mist-600">
                 {form.description.trim().length < 30
                   ? "Write or upload a description above — skills appear here automatically."
                   : "No skills detected in this description."}
@@ -349,16 +350,16 @@ export default function NewJobModal({ open, onClose, onCreated }) {
                 {skills.map((skill) => (
                   <span
                     key={skill}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-brand/35 bg-brand/12 px-2.5 py-1 text-xs font-medium text-brand-hi"
                   >
                     {skill}
                     <button
                       type="button"
                       onClick={() => setSkills((list) => list.filter((s) => s !== skill))}
-                      className="text-indigo-400 hover:text-indigo-700"
+                      className="text-indigo-400 hover:text-brand-hi"
                       title="Remove this skill"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="h-3 w-3" aria-hidden="true" />
                     </button>
                   </span>
                 ))}
@@ -367,7 +368,7 @@ export default function NewJobModal({ open, onClose, onCreated }) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-xs leading-5 text-indigo-900">
+        <div className="rounded-tile border border-indigo-100 bg-brand/12/60 px-4 py-3 text-xs leading-5 text-indigo-900">
           Publishing sets the post to <span className="font-semibold">Open</span> and visible to every applicant
           immediately. The card summary is generated from your description automatically.
         </div>
@@ -379,13 +380,13 @@ export default function NewJobModal({ open, onClose, onCreated }) {
 function Field({ label, value, onChange, type = "text", placeholder }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">{label}</span>
       <input
         type={type}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1.5 h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-300"
+        className="mt-1.5 h-10 w-full rounded-tile border border-ink-600 bg-ink-800 px-3 text-sm text-paper outline-none transition placeholder:text-mist-600 focus:border-brand/35"
       />
     </label>
   );
@@ -394,11 +395,11 @@ function Field({ label, value, onChange, type = "text", placeholder }) {
 function Select({ label, value, onChange, options }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-300"
+        className="mt-1.5 h-10 w-full rounded-tile border border-ink-600 bg-ink-800 px-3 text-sm text-paper outline-none transition focus:border-brand/35"
       >
         {options.map((o) => (
           <option key={o} value={o}>

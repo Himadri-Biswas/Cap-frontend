@@ -4,6 +4,7 @@ import { useSession } from "./auth/SessionProvider.jsx";
 import AuthGate, { SplashScreen, SessionErrorScreen } from "./auth/AuthGate.jsx";
 import MockHRTalentDashboard from "./app/MockHRTalentDashboard.jsx";
 import ApplicantPortal from "./features/applicant/ApplicantPortal.jsx";
+import Onboarding from "./features/applicant/Onboarding.jsx";
 import EmployeePortal from "./features/employee/EmployeePortal.jsx";
 
 /**
@@ -23,6 +24,12 @@ function RoleRouter() {
 
   if (activeRole === "admin") return <MockHRTalentDashboard />;
   if (activeRole === "employee") return <EmployeePortal />;
+
+  // A brand-new account has no profile and no CV yet. Collect both once, here,
+  // rather than asking for them again on every job application. `onboardedAt`
+  // is stamped when they finish (or skip), so this screen never comes back.
+  if (!user.onboardedAt) return <Onboarding />;
+
   return <ApplicantPortal />;
 }
 

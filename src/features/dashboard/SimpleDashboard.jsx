@@ -1,24 +1,42 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowUpRight,
   BriefcaseBusiness,
   FileText,
+  GraduationCap,
   Loader2,
   TrendingDown,
   UserCheck,
   Users,
   Zap,
 } from "lucide-react";
+import Panel, { Stat, EmptyState } from "../../components/ui/Panel.jsx";
+import { Meter } from "../../components/Delta.jsx";
+import { CountUp } from "../../components/Motion.jsx";
 import Pill from "../../components/ui/Pill.jsx";
 import { cx } from "../../lib/cx.js";
 import { api } from "../../lib/api.js";
 
 /**
- * Every number here is now a live aggregate from MongoDB. The hard-coded demo
- * figures (735 employees, 97% attendance, a fixed 68/20/12 risk split) are
- * gone — the layout is the same, the data is real.
+ * Overview.
+ *
+ * Opens on the one number an HR lead actually acts on — how many people are
+ * at critical attrition risk right now — rather than a row of equally-weighted
+ * KPI tiles. Everything below it is ordered by how urgent it is: who is at
+ * risk, then what's moving in hiring, then the standing totals.
+ *
+ * Every figure is live from MongoDB.
  */
-function SimpleDashboard({ jobs = [], onNavigate }) {
+
+const RISK_BANDS = [
+  { key: "Critical", tone: "risk", label: "Critical" },
+  { key: "High", tone: "risk", label: "High" },
+  { key: "Medium", tone: "raw", label: "Medium" },
+  { key: "Low", tone: "ok", label: "Low" },
+];
+
+function SimpleDashboard({ jobs = [], employees = [], onNavigate }) {
   const [data, setData] = useState(null);
   const [topRisk, setTopRisk] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,13 +48,13 @@ function SimpleDashboard({ jobs = [], onNavigate }) {
       try {
         const [dashboard, risk] = await Promise.all([
           api.dashboard(),
-          api.attrition.topRisk(5).catch(() => ({ employees: [] })),
+          api.attrition.topRisk(6).catch(() => ({ employees: [] })),
         ]);
         if (cancelled) return;
         setData(dashboard);
         setTopRisk(risk.employees || []);
       } catch (err) {
-        if (!cancelled) setError(err.message || "Could not load dashboard data.");
+        if (!cancelled) setError(err.message || "Could not load the overview.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -46,391 +64,388 @@ function SimpleDashboard({ jobs = [], onNavigate }) {
     };
   }, []);
 
-  const stats = [
-    {
-      label: "Total Employees",
-      value: data?.stats.totalEmployees ?? "—",
-      tone: "blue",
-      icon: Users,
-      hint: data ? `${data.stats.formerEmployees} former` : "",
-      view: "employees",
-    },
-    {
-      label: "Open Positions",
-      value: data?.stats.openPositions ?? "—",
-      tone: "purple",
-      icon: BriefcaseBusiness,
-      hint: data ? `${data.stats.totalApplications} applications` : "",
-      view: "recruitment",
-    },
-    {
-      label: "New Applications",
-      value: data?.stats.newApplications ?? "—",
-      tone: "green",
-      icon: FileText,
-      hint: "last 7 days",
-      view: "recruitment",
-    },
-    {
-      label: "Shortlisted",
-      value: data?.stats.shortlisted ?? "—",
-      tone: "amber",
-      icon: UserCheck,
-      hint: data ? `${data.stats.analysedEmployees} employees analysed` : "",
-      view: "recruitment",
-    },
-  ];
+  const tiers = data?.attrition?.tiers || {};
+  const analysed = data?.attrition?.analysed ?? 0;
+  const atRisk = (tiers.Critical || 0) + (tiers.High || 0);
+  const coverage = data?.stats?.totalEmployees
+    ? Math.round((data.stats.analysedEmployees / data.stats.totalEmployees) * 100)
+    : 0;
 
-  const iconBg = (tone) =>
-    tone === "blue"
-      ? "bg-blue-100 text-blue-700"
-      : tone === "green"
-      ? "bg-emerald-100 text-emerald-700"
-      : tone === "amber"
-      ? "bg-amber-100 text-amber-700"
-      : "bg-violet-100 text-violet-700";
-
-  // The donut still shows vacancy mix, now weighted by real openings per dept.
-  const vacancies = data?.vacancies || [];
-  const totalVacancies = vacancies.reduce((sum, v) => sum + v.openings, 0);
-  const donutColors = ["#3b82f6", "#8b5cf6", "#f59e0b", "#22c55e", "#ec4899", "#14b8a6"];
-
-  const donutStyle = {
-    background: totalVacancies
-      ? `conic-gradient(${vacancies
-          .reduce(
-            (acc, v, i) => {
-              const start = acc.cursor;
-              const end = start + (v.openings / totalVacancies) * 100;
-              acc.cursor = end;
-              acc.parts.push(`${donutColors[i % donutColors.length]} ${start}% ${end}%`);
-              return acc;
-            },
-            { cursor: 0, parts: [] }
-          )
-          .parts.join(", ")})`
-      : "conic-gradient(#e2e8f0 0 100%)",
-  };
-
-  const distribution = data
-    ? [
-        { label: "Low", percent: data.attrition.percentages.Low, count: data.attrition.tiers.Low, color: "bg-blue-500" },
-        {
-          label: "Medium",
-          percent: data.attrition.percentages.Medium,
-          count: data.attrition.tiers.Medium,
-          color: "bg-orange-500",
-        },
-        {
-          label: "High",
-          percent: data.attrition.percentages.High,
-          count: data.attrition.tiers.High + data.attrition.tiers.Critical,
-          color: "bg-pink-500",
-        },
-      ]
-    : [];
+  const bands = useMemo(
+    () =>
+      RISK_BANDS.map((band) => ({
+        ...band,
+        count: tiers[band.key] || 0,
+        share: analysed ? ((tiers[band.key] || 0) / analysed) * 100 : 0,
+      })),
+    [tiers, analysed]
+  );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-3 rounded-[28px] border border-slate-200 bg-white p-16 text-sm text-slate-500 shadow-sm">
-        <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
-        Loading dashboard…
+      <div className="panel flex items-center justify-center gap-3 p-20 text-sm text-mist-500">
+        <Loader2 className="h-4 w-4 animate-spin text-brand" aria-hidden="true" />
+        Loading the overview
       </div>
     );
   }
 
   return (
-    <div className="rounded-[28px] overflow-hidden border border-slate-200 bg-white shadow-sm">
-      <div
-        className="p-6"
-        style={{
-          background:
-            "linear-gradient(135deg, #EEF2FF 0%, #EEF2FF 52%, #FFFFFF 52%, #FFFFFF 100%)",
-        }}
-      >
-        {error && (
-          <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>
-        )}
+    <div className="space-y-4">
+      {error && (
+        <div className="panel border-risk/35 bg-risk/8 p-4 text-sm text-risk">{error}</div>
+      )}
 
-        <div className="grid gap-5 lg:grid-cols-[1.6fr_0.9fr]">
-          {/* LEFT */}
-          <div className="space-y-5">
-            {/* Stats */}
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {stats.map((s) => {
-                const Icon = s.icon;
-                return (
-                  <button
-                    key={s.label}
-                    onClick={() => s.view && onNavigate?.(s.view)}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-indigo-200 hover:shadow-md"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
-                        <div className="text-xs text-slate-500">{s.label}</div>
-                        <div className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{s.value}</div>
-                        {s.hint ? <div className="mt-0.5 truncate text-[11px] text-slate-400">{s.hint}</div> : null}
-                      </div>
-                      <div className={cx("h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center", iconBg(s.tone))}>
-                        <Icon className="h-5 w-5" />
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+      {/* ── The headline. One figure, the thing worth acting on today. ───── */}
+      <section className="feature enter" style={{ "--i": 0 }}>
+        <div className="relative grid gap-8 p-7 lg:grid-cols-[1.05fr_1fr] lg:p-9">
+          <div>
+            <span className="num text-[10px] font-medium uppercase tracking-[0.2em] feature-faint">
+              People at risk of leaving
+            </span>
+            <div className="mt-3 flex items-end gap-4">
+              <span className="num display-xl text-[88px] text-[#ff7a8f]">
+                <CountUp value={atRisk} />
+              </span>
+              <span className="mb-3 text-sm leading-5 feature-dim">
+                of {analysed} analysed
+                <br />
+                <span className="feature-faint">{coverage}% of headcount scored</span>
+              </span>
             </div>
-
-            {/* Upskilling + Attrition */}
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-900">Upskilling Overview</div>
-                  <button
-                    onClick={() => onNavigate?.("upskilling")}
-                    className="text-xs text-slate-500 hover:text-slate-700"
-                  >
-                    View All
-                  </button>
-                </div>
-                <div className="mt-4">
-                  <div className="text-2xl font-bold text-slate-900">{data?.upskilling.pathCount ?? 0}</div>
-                  <div className="text-xs text-slate-500">Learning paths generated</div>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {[
-                    {
-                      k: "Average job readiness",
-                      v: data?.upskilling.avgReadiness ?? 0,
-                      display: `${data?.upskilling.avgReadiness ?? 0}%`,
-                      c: "bg-emerald-500",
-                    },
-                    {
-                      k: "Attrition coverage",
-                      v: data?.stats.totalEmployees
-                        ? Math.round((data.stats.analysedEmployees / data.stats.totalEmployees) * 100)
-                        : 0,
-                      display: `${data?.stats.analysedEmployees ?? 0} / ${data?.stats.totalEmployees ?? 0}`,
-                      c: "bg-blue-500",
-                    },
-                    {
-                      k: "Training hours planned",
-                      v: Math.min(100, (data?.upskilling.totalHours ?? 0) / 10),
-                      display: `${data?.upskilling.totalHours ?? 0}h · $${data?.upskilling.totalCostUsd ?? 0}`,
-                      c: "bg-amber-500",
-                    },
-                  ].map((row) => (
-                    <div key={row.k}>
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span>{row.k}</span>
-                        <span className="font-semibold text-slate-700">{row.display}</span>
-                      </div>
-                      <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className={cx("h-full rounded-full transition-all duration-700", row.c)}
-                          style={{ width: `${Math.min(100, row.v)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-900">Attrition Risk Distribution</div>
-                  <Pill className="bg-slate-100 text-slate-700 border border-slate-200">
-                    {data?.attrition.analysed ?? 0} analysed
-                  </Pill>
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-                  {data?.attrition.analysed ? (
-                    <div className="mt-6 grid grid-cols-3 gap-10 items-end h-[220px] px-6">
-                      {distribution.map((d) => (
-                        <div key={d.label} className="flex flex-col items-center justify-end h-full">
-                          <div className="text-sm font-bold text-slate-800 mb-2">{d.label}</div>
-                          <div
-                            className={cx("w-14 rounded-sm border border-slate-700/50 transition-all duration-700", d.color)}
-                            style={{ height: `${Math.max(2, d.percent)}%` }}
-                          />
-                          <div className="mt-2 text-sm font-semibold text-slate-700">{d.percent}%</div>
-                          <div className="text-[11px] text-slate-400">{d.count} people</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex h-[220px] flex-col items-center justify-center text-center">
-                      <AlertTriangle className="h-8 w-8 text-slate-300" />
-                      <div className="mt-3 text-sm font-semibold text-slate-700">No predictions yet</div>
-                      <div className="mt-1 max-w-xs text-xs text-slate-500">
-                        Run <code className="rounded bg-slate-100 px-1">npm run db:precompute</code> to fill the
-                        attrition analysis for every employee.
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <p className="mt-4 max-w-md text-sm leading-6 feature-dim">
+              Each of these has counterfactual plans attached. Opening one shows what would move the number and by how
+              much, scored by the model rather than estimated.
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigate?.("employees")}
+              className="mt-6 inline-flex items-center gap-2 rounded-tile bg-white px-4 py-2.5 text-sm font-semibold text-[#101319] transition hover:bg-white/90"
+            >
+              Review at-risk employees
+              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            </button>
           </div>
 
-          {/* RIGHT */}
-          <div className="space-y-5">
-            {/* Top attrition risk — the same list that drives the admin bell */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <AlertTriangle className="h-4 w-4 text-rose-500" />
-                  Top attrition risk
-                </div>
-                <button
-                  onClick={() => onNavigate?.("employees")}
-                  className="text-xs text-slate-500 hover:text-slate-700"
-                >
-                  View All
-                </button>
-              </div>
+          {/* Risk distribution as one stacked rule, not four floating bars. */}
+          <div className="self-end">
+            <div className="mb-3 flex items-baseline justify-between">
+              <span className="num text-[10px] font-medium uppercase tracking-[0.2em] feature-faint">Risk distribution</span>
+              <span className="num text-[11px] feature-faint">{analysed} scored</span>
+            </div>
 
-              {topRisk.length === 0 ? (
-                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                  No predictions computed yet.
-                </div>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {topRisk.map((e) => (
-                    <button
-                      key={e.EmployeeNumber}
-                      onClick={() => onNavigate?.("employees", e.id || String(e.EmployeeNumber))}
-                      className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5 text-left transition hover:border-rose-200 hover:bg-rose-50/40"
-                    >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-rose-600 text-[11px] font-bold text-white">
-                        {e.initials || `#${e.rank}`}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-slate-900">
-                          {e.name || `Employee #${e.EmployeeNumber}`}
-                        </div>
-                        <div className="truncate text-[11px] text-slate-500">
-                          {e.JobRole || "—"} · {e.primary_reason || "N/A"}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div className="text-sm font-bold text-rose-600">{e.attrition_pct}%</div>
-                        <div className="text-[10px] text-slate-400">{e.risk_tier}</div>
-                      </div>
-                    </button>
+            {analysed ? (
+              <>
+                <div className="flex h-3 w-full overflow-hidden rounded-full bg-white/10">
+                  {bands.map((band, i) => (
+                    <div
+                      key={band.key}
+                      className={cx(
+                        "h-full sweep first:rounded-l-full last:rounded-r-full",
+                        band.tone === "risk" ? "bg-[#ff7a8f]" : band.tone === "raw" ? "bg-[#f0b429]" : "bg-[#34d399]"
+                      )}
+                      style={{ width: `${band.share}%`, "--i": i, opacity: band.key === "High" ? 0.62 : 1 }}
+                      title={`${band.label}: ${band.count}`}
+                    />
                   ))}
                 </div>
-              )}
-            </div>
-
-            {/* Vacancy Summary */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="text-sm font-semibold text-slate-900">Job Vacancy Summary</div>
-              <div className="mt-4 flex items-center gap-4">
-                <div className="relative h-36 w-36 shrink-0 rounded-full" style={donutStyle}>
-                  <div className="absolute inset-4 rounded-full bg-white border border-slate-200 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-slate-900">{totalVacancies}</div>
-                      <div className="text-xs text-slate-500">Vacancies</div>
+                <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2.5">
+                  {bands.map((band) => (
+                    <div key={band.key} className="flex items-center gap-2 border-b border-white/10 pb-2">
+                      <span
+                        aria-hidden="true"
+                        className={cx(
+                          "h-2 w-2 shrink-0 rounded-full",
+                          band.tone === "risk" ? "bg-[#ff7a8f]" : band.tone === "raw" ? "bg-[#f0b429]" : "bg-[#34d399]"
+                        )}
+                        style={{ opacity: band.key === "High" ? 0.62 : 1 }}
+                      />
+                      <dt className="flex-1 text-xs feature-dim">{band.label}</dt>
+                      <dd className="num text-xs font-semibold text-white">{band.count}</dd>
+                      <dd className="num w-10 text-right text-[11px] feature-faint">{Math.round(band.share)}%</dd>
                     </div>
-                  </div>
-                </div>
-                <div className="flex-1 space-y-2 text-sm">
-                  {vacancies.length === 0 ? (
-                    <div className="text-xs text-slate-500">No open positions.</div>
-                  ) : (
-                    vacancies.map((v, i) => (
-                      <div key={v.dept} className="flex items-center gap-2 text-slate-700">
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ background: donutColors[i % donutColors.length] }}
-                        />
-                        <span className="truncate">
-                          {v.dept} ({String(v.openings).padStart(2, "0")})
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Headcount by department */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900">Employees by department</div>
-                <button
-                  onClick={() => onNavigate?.("employees")}
-                  className="text-xs text-slate-500 hover:text-slate-700"
-                >
-                  View All
-                </button>
-              </div>
-
-              <div className="mt-3 space-y-3">
-                {(data?.departments || []).slice(0, 5).map((t) => (
-                  <div
-                    key={t.name}
-                    className="rounded-2xl border border-slate-200 bg-white p-3 flex items-center justify-between"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-slate-900">{t.name}</div>
-                      <div className="text-xs text-slate-500">Total Members: {t.members}</div>
-                    </div>
-                    <div className="flex -space-x-2">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div
-                          key={i}
-                          className="h-7 w-7 rounded-full border-2 border-white bg-gradient-to-br from-indigo-200 to-sky-200"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {!data?.departments?.length && (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                    No employees loaded. Run <code className="rounded bg-white px-1">npm run db:seed</code>.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Recent live interventions */}
-            {data?.recentEvents?.length > 0 && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <Zap className="h-4 w-4 text-emerald-500" />
-                  Recent live interventions
-                </div>
-                <div className="mt-3 space-y-2">
-                  {data.recentEvents.slice(0, 5).map((event) => {
-                    const improved = event.delta != null && event.delta < 0;
-                    return (
-                      <div key={event._id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 text-xs font-semibold text-slate-800">
-                            <span className="truncate">{event.employeeName || `#${event.EmployeeNumber}`}</span>
-                            <span className="font-normal text-slate-500"> · {event.feature_label}</span>
-                          </div>
-                          {event.delta != null && (
-                            <div
-                              className={cx(
-                                "flex shrink-0 items-center gap-0.5 text-xs font-bold",
-                                improved ? "text-emerald-600" : "text-rose-600"
-                              )}
-                            >
-                              <TrendingDown className={cx("h-3 w-3", !improved && "rotate-180")} />
-                              {Math.abs(event.delta * 100).toFixed(1)}%
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                  ))}
+                </dl>
+              </>
+            ) : (
+              <div className="feature-well p-5 text-xs leading-5 feature-dim">
+                Nothing scored yet. Run{" "}
+                <code className="num rounded bg-ink-750 px-1 text-mist-200">npm run db:precompute</code> to score every
+                employee.
               </div>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* ── Standing totals ────────────────────────────────────────────── */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat
+          index={1}
+          label="Headcount"
+          value={data?.stats.totalEmployees ?? "—"}
+          icon={Users}
+          hint={data ? `${data.stats.formerEmployees} former` : ""}
+        />
+        <Stat
+          index={2}
+          label="Open roles"
+          value={data?.stats.openPositions ?? "—"}
+          icon={BriefcaseBusiness}
+          hint={data ? `${data.stats.totalApplications} applications` : ""}
+        />
+        <Stat
+          index={3}
+          label="New applications"
+          value={data?.stats.newApplications ?? "—"}
+          icon={FileText}
+          tone="brand"
+          hint="last 7 days"
+        />
+        <Stat
+          index={4}
+          label="Shortlisted"
+          value={data?.stats.shortlisted ?? "—"}
+          icon={UserCheck}
+          tone="ok"
+          hint={data ? `${data.stats.analysedEmployees} employees scored` : ""}
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_0.85fr]">
+        <div className="space-y-4">
+          {/* ── Who to look at first ─────────────────────────────────────── */}
+          <Panel
+            index={5}
+            className="enter"
+            title="Highest attrition risk"
+            caption="Ranked by the stored probability. The same list drives the alert bell."
+            actions={
+              <button
+                type="button"
+                onClick={() => onNavigate?.("employees")}
+                className="text-[11px] font-medium text-mist-500 transition-colors hover:text-paper"
+              >
+                All employees
+              </button>
+            }
+            bodyClassName="p-2"
+          >
+            {topRisk.length === 0 ? (
+              <div className="px-3 py-8 text-center text-xs text-mist-500">Nothing scored yet.</div>
+            ) : (
+              <ul>
+                {topRisk.map((e, i) => (
+                  <li key={e.EmployeeNumber}>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.("employees", e.id || String(e.EmployeeNumber))}
+                      className="group flex w-full items-center gap-3 rounded-tile px-2 py-2.5 text-left transition-colors hover:bg-ink-750"
+                    >
+                      <span className="num w-5 shrink-0 text-right text-[11px] text-mist-600">{i + 1}</span>
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-tile border border-risk/30 bg-risk/10 text-[10px] font-bold text-risk">
+                        {e.initials || "—"}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-paper">
+                          {e.name || `Employee #${e.EmployeeNumber}`}
+                        </span>
+                        <span className="block truncate text-[11px] text-mist-600">
+                          {e.JobRole || "—"} · driver: {e.primary_reason || "not identified"}
+                        </span>
+                      </span>
+                      {/* The bar carries the magnitude; the number carries the value. */}
+                      <span className="hidden w-24 shrink-0 sm:block">
+                        <span className="block h-1 overflow-hidden rounded-full bg-ink-700">
+                          <span
+                            className="block h-full rounded-full bg-risk sweep"
+                            style={{ width: `${Math.min(e.attrition_pct, 100)}%`, "--i": i }}
+                          />
+                        </span>
+                      </span>
+                      <span className="num w-14 shrink-0 text-right text-sm font-semibold text-risk">
+                        {e.attrition_pct}%
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          {/* ── What changed recently ────────────────────────────────────── */}
+          {data?.recentEvents?.length > 0 && (
+            <Panel
+              index={6}
+              className="enter"
+              title="Recent interventions"
+              caption="Counterfactuals written to the employee record, with the risk the model returned after."
+              bodyClassName="p-2"
+            >
+              <ul className="space-y-0.5">
+                {data.recentEvents.slice(0, 5).map((event) => {
+                  const improved = event.delta != null && event.delta < 0;
+                  return (
+                    <li
+                      key={event._id}
+                      className="flex items-center gap-3 rounded-tile px-2 py-2 transition-colors hover:bg-ink-750"
+                    >
+                      <Zap
+                        className={cx("h-3.5 w-3.5 shrink-0", improved ? "text-ok" : "text-mist-600")}
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] text-paper">
+                          {event.employeeName || `#${event.EmployeeNumber}`}
+                        </span>
+                        <span className="block truncate text-[11px] text-mist-600">{event.feature_label}</span>
+                      </span>
+                      {event.prob_before != null && event.prob_after != null && (
+                        <span className="num hidden shrink-0 text-[11px] text-mist-500 sm:block">
+                          {(event.prob_before * 100).toFixed(0)}
+                          <span className="mx-1 text-mist-700">→</span>
+                          <span className={improved ? "text-ok" : "text-risk"}>
+                            {(event.prob_after * 100).toFixed(0)}
+                          </span>
+                        </span>
+                      )}
+                      {event.delta != null && (
+                        <span
+                          className={cx(
+                            "num flex shrink-0 items-center gap-0.5 text-xs font-semibold",
+                            improved ? "text-ok" : "text-risk"
+                          )}
+                        >
+                          <TrendingDown
+                            className={cx("h-3 w-3", !improved && "rotate-180")}
+                            aria-hidden="true"
+                          />
+                          {Math.abs(event.delta * 100).toFixed(1)}
+                          <span className="sr-only">{improved ? "points lower" : "points higher"}</span>
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Panel>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          {/* ── Hiring ───────────────────────────────────────────────────── */}
+          <Panel
+            index={7}
+            className="enter"
+            title="Open roles"
+            caption={`${data?.vacancies?.length || 0} departments hiring`}
+            actions={
+              <button
+                type="button"
+                onClick={() => onNavigate?.("recruitment")}
+                className="text-[11px] font-medium text-mist-500 transition-colors hover:text-paper"
+              >
+                Recruitment
+              </button>
+            }
+          >
+            {(data?.vacancies || []).length === 0 ? (
+              <p className="py-4 text-xs text-mist-500">No open positions.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {(data.vacancies || []).map((v, i) => {
+                  const top = Math.max(...data.vacancies.map((x) => x.openings), 1);
+                  return (
+                    <Meter
+                      key={v.dept}
+                      label={v.dept}
+                      value={v.openings}
+                      max={top}
+                      tone="brand"
+                      index={i}
+                      right={String(v.openings).padStart(2, "0")}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+
+          {/* ── Learning ─────────────────────────────────────────────────── */}
+          <Panel
+            index={8}
+            className="enter"
+            title="Upskilling"
+            caption="Learning paths generated under time and budget limits"
+            actions={
+              <button
+                type="button"
+                onClick={() => onNavigate?.("upskilling")}
+                className="text-[11px] font-medium text-mist-500 transition-colors hover:text-paper"
+              >
+                Open
+              </button>
+            }
+          >
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="num display text-4xl font-bold text-paper">{data?.upskilling.pathCount ?? 0}</div>
+                <div className="mt-0.5 text-[11px] text-mist-600">paths built</div>
+              </div>
+              <GraduationCap className="h-5 w-5 text-mist-700" aria-hidden="true" />
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <Meter
+                label="Job readiness"
+                value={data?.upskilling.avgReadiness ?? 0}
+                max={100}
+                tone="fair"
+                index={0}
+                right={`${data?.upskilling.avgReadiness ?? 0}%`}
+              />
+              <Meter
+                label="Scored headcount"
+                value={coverage}
+                max={100}
+                tone="brand"
+                index={1}
+                right={`${coverage}%`}
+              />
+              <div className="flex items-baseline justify-between border-t border-ink-700 pt-3">
+                <span className="text-xs text-mist-400">Planned training</span>
+                <span className="num text-xs font-semibold text-paper">
+                  {data?.upskilling.totalHours ?? 0}h · ${data?.upskilling.totalCostUsd ?? 0}
+                </span>
+              </div>
+            </div>
+          </Panel>
+
+          {/* ── Headcount ────────────────────────────────────────────────── */}
+          <Panel index={9} className="enter" title="Headcount by department">
+            {(data?.departments || []).length === 0 ? (
+              <p className="py-2 text-xs text-mist-500">
+                No employees loaded. Run <code className="num rounded bg-ink-750 px-1">npm run db:seed</code>.
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {(data.departments || []).slice(0, 6).map((t, i) => {
+                  const top = Math.max(...data.departments.map((x) => x.members), 1);
+                  return (
+                    <Meter
+                      key={t.name}
+                      label={t.name}
+                      value={t.members}
+                      max={top}
+                      tone="fair"
+                      index={i}
+                      right={String(t.members)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
         </div>
       </div>
     </div>

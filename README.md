@@ -214,7 +214,7 @@ order.
 | Skill extraction | GLiNER (`gliner-community/gliner_large-v2.5`) |
 | Semantic similarity | Sentence-BERT (`all-mpnet-base-v2`) |
 | Course/skill graph | NetworkX |
-| API | FastAPI (Python), see `api/` |
+| API | FastAPI (Python), see `ml-backends/module2/` |
 | Data | Synthetic employee/JD/course catalog (`notebooks/data/`) |
 
 ## Frontend integration
@@ -223,5 +223,65 @@ The "Upskilling" tab (`src/features/upskilling/UpskillingView.jsx`) calls
 the Module 2 API directly, following the same pattern as Module 1/3: set
 `VITE_MODULE2_API_URL` in `.env.local`, pick an employee + target job (or
 write a custom job description), then "Generate Learning Path". See
-`api/README.md` for running the backend locally and deploying it to
+`ml-backends/module2/README.md` for running the backend locally and deploying it to
 HuggingFace Spaces.
+
+---
+
+# Deploying to Vercel
+
+## Repository layout Vercel cares about
+
+| Path | What Vercel does with it |
+|------|--------------------------|
+| `api/[...path].js` | The one and only Serverless Function. Every `/api/...` request lands here and is handed to `server/app.js` (Express + MongoDB + Clerk). |
+| `server/` | Imported by that function, bundled with it. Never started as a process — `server/index.js` is for `npm run dev` / `npm start` only. |
+| `dist/` | The Vite build output, served as static files. |
+| `ml-backends/module2/` | Reference source for the module-2 HuggingFace Space. Excluded from the deployment by `.vercelignore`. |
+
+**Nothing except `[...path].js` may live in `api/`.** Vercel turns every file in
+that directory into a Serverless Function and picks a runtime from the file
+extensions it finds there. The module-2 Python backend used to sit in `api/`,
+and its `requirements.txt` made Vercel try to build `app.py` with the Python
+runtime — torch + transformers + gliner bundle to several GB, far past the size
+limit, so the build failed and *no* function was published at all. Every
+`/api/...` call then fell through to Vercel's static router and came back as the
+platform 404 page:
+
+> The page could not be found  NOT_FOUND  bom1::xxxxx-…
+
+which the UI surfaced as an error inside the panel that made the call. Running
+locally never showed it, because `npm run dev` starts the Express server itself
+and Vite proxies `/api` to it (see `vite.config.js`) — the serverless packaging
+step that was failing simply does not exist locally.
+
+## Environment variables to set in the Vercel project
+
+`.env.local` is git-ignored, so none of it reaches Vercel. Add these under
+**Project → Settings → Environment Variables** (Production *and* Preview):
+
+| Variable | Needed by | Notes |
+|----------|-----------|-------|
+| `MONGO_URI` | server | Atlas connection string. Without it every `/api` call fails at connect time. |
+| `MONGO_DB_NAME` | server | Defaults to `IBM_HR_Analytics`. |
+| `CLERK_SECRET_KEY` | server | Session verification. |
+| `CLERK_PUBLISHABLE_KEY` | server | |
+| `ADMIN_EMAILS` | server | Comma-separated; these accounts get `admin` on first sign-in. |
+| `VITE_CLERK_PUBLISHABLE_KEY` | build | Baked into the bundle at build time. |
+| `VITE_API_URL` | build | Module 3 Space. |
+| `VITE_MODULE1_API_URL` | build | Module 1 skill extractor Space. |
+| `VITE_MODULE1_RANKING_API_URL` | build | Module 1 ranking / debiasing Space. |
+| `VITE_MODULE2_API_URL` | build | Module 2 Space. |
+
+Leave `VITE_SERVER_URL` unset: the browser then calls `/api/...` on the same
+origin, which is what the catch-all function serves.
+
+`AUTH_DISABLED` must **never** be set in a deployed environment — it is the
+local-demo escape hatch that trusts an `x-demo-email` header.
+
+## Checking a deployment
+
+`GET https://<your-app>.vercel.app/api/health` should return JSON with
+`mongo.connected: true`. If it returns Vercel's HTML 404 page instead, the
+function was not published — check the build log for a Python or size error
+before looking anywhere else.

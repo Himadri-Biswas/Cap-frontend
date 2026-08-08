@@ -16,6 +16,7 @@
  * be retried. A database outage in the ML path must never lose a submission.
  */
 import { Router } from "express";
+import mongoose from "mongoose";
 import multer from "multer";
 import { requireAuth, requireAdmin, asyncHandler, HttpError, withUser } from "../middleware/auth.js";
 import {
@@ -30,7 +31,7 @@ import {
   nextSequence,
   APPLICATION_STATUSES,
 } from "../models/index.js";
-import { storeCv, validateCv } from "../lib/files.js";
+import { storeCv, validateCv, readCvBuffer } from "../lib/files.js";
 import { readFileText, extractSkillsFromFile } from "../lib/ml.js";
 import {
   checkCooldown,
@@ -58,8 +59,11 @@ router.post(
 
     const job = await Job.findOne({ id: jobId }).lean();
     if (!job) throw new HttpError(404, "Job not found.");
-    if (job.status === "archived" || !job.visibleToApplicants) {
-      throw new HttpError(403, "This job is no longer accepting applications.");
+    // "open" is the only status that accepts applications — an admin who stops
+    // a posting sets it to "closed", and that must hold on the server, not
+    // only in the button the applicant sees.
+    if (job.status !== "open" || !job.visibleToApplicants) {
+      throw new HttpError(403, "This job is no longer accepting applications.", "job_closed");
     }
 
     const [y, m, d] = String(job.deadline).split("-").map(Number);
@@ -85,43 +89,107 @@ router.post(
       throw err;
     }
 
-    const fileError = validateCv(req.file);
-    if (fileError) throw new HttpError(400, fileError, "invalid_file");
-
     const applicationId = await nextId("application", "APP-");
     const candidateSeq = await nextSequence("candidate");
 
-    // ── 2. Store the CV bytes ───────────────────────────────────────────
-    const cvFile = await storeCv(req.file, {
-      ownerUserId: req.user.clerkUserId,
-      ownerEmail: req.user.email,
-      kind: "application_cv",
-      applicationId,
-      jobId,
-    });
+    /**
+     * ── 2. The CV ────────────────────────────────────────────────────────
+     *
+     * Two ways in. The normal one now is `cvFileId`: the applicant picked a
+     * document already sitting in their library, uploaded and parsed once at
+     * sign-up, so there is nothing to store and usually nothing to extract —
+     * the application just references the same GridFS file. A raw `cv` upload
+     * still works for anyone applying before they have a library.
+     */
+    const requestedCvFileId = (req.body.cvFileId || "").trim();
+    let cvFile;
+    let cvText = "";
+    let extraction = null;
 
-    // ── 3. Module 1 enrichment (best-effort) ────────────────────────────
-    const mlPayload = {
-      buffer: req.file.buffer,
-      filename: req.file.originalname,
-      mimeType: cvFile.mimeType,
-    };
-    const [textResult, extraction] = await Promise.all([
-      readFileText(mlPayload).catch(() => null),
-      extractSkillsFromFile(mlPayload).catch((err) => ({ __error: err.message })),
-    ]);
+    if (requestedCvFileId) {
+      if (!mongoose.isValidObjectId(requestedCvFileId)) {
+        throw new HttpError(400, "That CV id is not valid.", "invalid_file");
+      }
+      cvFile = await CvFile.findOne({
+        fileId: new mongoose.Types.ObjectId(requestedCvFileId),
+        deleted: { $ne: true },
+      });
+      if (!cvFile) throw new HttpError(404, "That CV is no longer in your library.", "invalid_file");
+      if (cvFile.ownerUserId !== req.user.clerkUserId) throw new HttpError(403, "That CV is not yours.");
+
+      cvText = (cvFile.extractedText || "").trim();
+      if (cvFile.extractionStatus === "done" && cvFile.extraction) {
+        // The happy path: everything was parsed at upload time.
+        extraction = cvFile.extraction;
+      } else {
+        // Uploaded while a HuggingFace Space was cold. Retry once, now, and
+        // write the result back so the next application skips this entirely.
+        const buffer = await readCvBuffer(cvFile.fileId).catch(() => null);
+        if (buffer) {
+          const retryPayload = { buffer, filename: cvFile.originalName, mimeType: cvFile.mimeType };
+          const [retryText, retryExtraction] = await Promise.all([
+            cvText ? Promise.resolve(null) : readFileText(retryPayload).catch(() => null),
+            extractSkillsFromFile(retryPayload).catch((err) => ({ __error: err.message })),
+          ]);
+          if (!cvText) cvText = (retryText?.text || "").trim();
+          extraction = retryExtraction;
+
+          if (extraction && !extraction.__error) {
+            const retrySkills = flattenExtractedSkills(extraction);
+            await CvFile.updateOne(
+              { fileId: cvFile.fileId },
+              {
+                $set: {
+                  extraction,
+                  extractionStatus: "done",
+                  extractedAt: new Date(),
+                  skills: retrySkills,
+                  skillCount: retrySkills.length,
+                  ...(cvText
+                    ? { extractedText: cvText, extractedTextChars: cvText.length, textExtractionStatus: "done" }
+                    : {}),
+                },
+              }
+            );
+          }
+        }
+      }
+    } else {
+      const fileError = validateCv(req.file);
+      if (fileError) throw new HttpError(400, fileError, "invalid_file");
+
+      cvFile = await storeCv(req.file, {
+        ownerUserId: req.user.clerkUserId,
+        ownerEmail: req.user.email,
+        kind: "application_cv",
+        applicationId,
+        jobId,
+      });
+
+      // ── 3. Module 1 enrichment (best-effort) ──────────────────────────
+      const mlPayload = {
+        buffer: req.file.buffer,
+        filename: req.file.originalname,
+        mimeType: cvFile.mimeType,
+      };
+      const [textResult, freshExtraction] = await Promise.all([
+        readFileText(mlPayload).catch(() => null),
+        extractSkillsFromFile(mlPayload).catch((err) => ({ __error: err.message })),
+      ]);
+      cvText = (textResult?.text || "").trim();
+      extraction = freshExtraction;
+
+      if (cvText) {
+        await CvFile.updateOne(
+          { fileId: cvFile.fileId },
+          { $set: { extractedText: cvText, extractedTextChars: cvText.length, textExtractionStatus: "done" } }
+        );
+      }
+    }
 
     const extractionFailed = !extraction || extraction.__error;
-    const cvText = (textResult?.text || "").trim();
     const skills = extractionFailed ? [] : flattenExtractedSkills(extraction);
     const scored = heuristicScore(skills, job.skills);
-
-    if (cvText) {
-      await CvFile.updateOne(
-        { fileId: cvFile.fileId },
-        { $set: { extractedText: cvText, extractedTextChars: cvText.length, textExtractionStatus: "done" } }
-      );
-    }
 
     // ── 4. Tags + history ───────────────────────────────────────────────
     const history = await buildApplicantHistory({
@@ -160,7 +228,7 @@ router.post(
       cvMimeType: cvFile.mimeType,
       cvExtension: cvFile.extension,
       cvSizeBytes: cvFile.sizeBytes,
-      cvUploadedAt: now,
+      cvUploadedAt: cvFile.createdAt || now,
       cvText,
       cvTextChars: cvText.length,
 
@@ -187,14 +255,17 @@ router.post(
       nextEligibleAt: new Date(now.getTime() + cooldownHours * 3600_000),
     });
 
-    // Remember this CV as the applicant's default for next time.
+    // Remember this CV as the applicant's default for next time. Skills are
+    // merged, not replaced: someone with several CVs in their library would
+    // otherwise lose everything the other documents contributed.
+    const mergedSkills = skills.length ? [...new Set([...(req.user.skills || []), ...skills])] : null;
     await User.updateOne(
       { clerkUserId: req.user.clerkUserId },
       {
         $set: {
           defaultCvFileId: cvFile.fileId,
           defaultCvFilename: cvFile.originalName,
-          ...(skills.length ? { skills } : {}),
+          ...(mergedSkills ? { skills: mergedSkills } : {}),
         },
       }
     );

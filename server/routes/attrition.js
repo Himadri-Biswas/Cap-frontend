@@ -19,7 +19,13 @@ import {
   MUTABLE_NUMERIC_FEATURES,
   MUTABLE_CATEGORICAL_FEATURES,
 } from "../models/index.js";
-import { applyIntervention, refreshAttritionNotifications, readCachedAnalysis } from "../lib/attrition.js";
+import {
+  applyIntervention,
+  applyChanges,
+  ensurePlansVerified,
+  refreshAttritionNotifications,
+  readCachedAnalysis,
+} from "../lib/attrition.js";
 
 const router = Router();
 
@@ -85,8 +91,31 @@ router.post(
     if (!feature) throw new HttpError(400, "feature is required.");
     const coerced = validateChange(feature, value);
 
-    if (employee[feature] === coerced) {
-      throw new HttpError(400, `${feature} is already ${coerced} — nothing to apply.`, "no_change");
+    // Already at the target value? That is not a failure, and it should not
+    // paint a red error across the panel. It happens when the DiCE plan on
+    // screen was rendered from a cached set that predates a change already
+    // written to this employee. Mark the plan applied so the button stops
+    // offering it, and hand back the CURRENT analysis with a `_noop` note so
+    // the UI can say so calmly. String-compare because Mongo may hold the
+    // number 2 where the counterfactual carries "2".
+    if (String(employee[feature]) === String(coerced)) {
+      await Intervention.updateMany(
+        {
+          EmployeeNumber: employeeNumber,
+          feature_changed: feature,
+          ...(cfIndex != null ? { cf_index: cfIndex } : {}),
+        },
+        { $set: { applied: true, applied_at: new Date() } }
+      );
+      const current = await readCachedAnalysis(employeeNumber);
+      return res.json({
+        ...(current || {}),
+        _noop: {
+          feature,
+          value: coerced,
+          message: `${feature} is already ${coerced} on this employee — that change is in effect, so nothing was re-written.`,
+        },
+      });
     }
 
     const result = await applyIntervention(employee, {
@@ -98,6 +127,79 @@ router.post(
     });
 
     res.json(result);
+  })
+);
+
+/**
+ * Apply an entire DiCE plan in one step.
+ * body: {changes: [{feature, value}], cfIndex?, planLabel?}
+ *
+ * Every change is written first and the model runs ONCE on the result, so the
+ * probability that comes back is the one the plan actually predicted. Applying
+ * the same actions one by one would score partial states instead.
+ */
+router.post(
+  "/:employeeNumber/apply-plan",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const employeeNumber = Number(req.params.employeeNumber);
+    const employee = await Employee.findOne({ EmployeeNumber: employeeNumber }).lean();
+    if (!employee) throw new HttpError(404, "Employee not found.");
+
+    const { changes = [], cfIndex = null, planLabel = "" } = req.body || {};
+    if (!Array.isArray(changes) || !changes.length) {
+      throw new HttpError(400, "changes must be a non-empty array of {feature, value}.");
+    }
+
+    // Validate everything before writing anything — a plan is applied whole or
+    // not at all, never half.
+    const coerced = [];
+    for (const change of changes) {
+      if (!change?.feature) throw new HttpError(400, "Every change needs a feature.");
+      coerced.push({ feature: change.feature, value: validateChange(change.feature, change.value) });
+    }
+
+    const seen = new Set();
+    for (const change of coerced) {
+      if (seen.has(change.feature)) {
+        throw new HttpError(400, `${change.feature} appears twice in this plan.`, "duplicate_feature");
+      }
+      seen.add(change.feature);
+    }
+
+    // Anything the employee already holds is dropped rather than failing the
+    // whole plan; only a plan with nothing left to do is a no-op.
+    const pending = coerced.filter((c) => String(employee[c.feature]) !== String(c.value));
+
+    if (!pending.length) {
+      await Intervention.updateMany(
+        {
+          EmployeeNumber: employeeNumber,
+          feature_changed: { $in: coerced.map((c) => c.feature) },
+          ...(cfIndex != null ? { cf_index: cfIndex } : {}),
+        },
+        { $set: { applied: true, applied_at: new Date() } }
+      );
+      const current = await readCachedAnalysis(employeeNumber);
+      return res.json({
+        ...(current || {}),
+        _noop: {
+          message: "Every change in this plan is already in effect, so nothing was re-written.",
+        },
+      });
+    }
+
+    const result = await applyChanges(employee, {
+      changes: pending,
+      cfIndex,
+      label: planLabel,
+      actor: { clerkUserId: req.user.clerkUserId, email: req.user.email },
+    });
+
+    res.json({
+      ...result,
+      _skipped: coerced.length - pending.length,
+    });
   })
 );
 
@@ -118,16 +220,22 @@ router.post(
     const employee = await Employee.findOne({ EmployeeNumber: employeeNumber }).lean();
     if (!employee) throw new HttpError(404, "Employee not found.");
 
-    const result = await applyIntervention(employee, {
-      feature: lastEvent.feature,
-      value: lastEvent.from_value,
+    // Undo every feature the step moved. A whole plan applied together has to
+    // come back together, or the employee is left in a state no plan describes.
+    // Events written before `changes` existed carry a single feature.
+    const undo = lastEvent.changes?.length
+      ? lastEvent.changes.map((c) => ({ feature: c.feature, value: c.from_value }))
+      : [{ feature: lastEvent.feature, value: lastEvent.from_value }];
+
+    const result = await applyChanges(employee, {
+      changes: undo,
       cfIndex: null,
-      interventionLabel: `Reverted: ${lastEvent.intervention_label}`,
+      label: `Reverted: ${lastEvent.intervention_label}`,
       actor: { clerkUserId: req.user.clerkUserId, email: req.user.email },
     });
 
     await Intervention.updateMany(
-      { EmployeeNumber: employeeNumber, feature_changed: lastEvent.feature },
+      { EmployeeNumber: employeeNumber, feature_changed: { $in: undo.map((u) => u.feature) } },
       { $set: { applied: false, applied_at: null } }
     );
     await AttritionEvent.updateOne({ _id: lastEvent._id }, { $set: { action: "reverted" } });
@@ -230,6 +338,8 @@ router.get(
     if (!req.user.roles.includes("admin") && req.user.employeeNumber !== employeeNumber) {
       throw new HttpError(403, "You can only view your own attrition analysis.");
     }
+    // Plans stored before verification existed get topped up here, once.
+    await ensurePlansVerified(employeeNumber).catch(() => {});
     const analysis = await readCachedAnalysis(employeeNumber);
     if (!analysis) throw new HttpError(404, "No analysis computed for this employee yet.");
     res.json(analysis);
