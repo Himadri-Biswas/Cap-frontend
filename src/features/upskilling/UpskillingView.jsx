@@ -622,16 +622,21 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                   <div className="my-4 border-t border-brand/15" />
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-widest text-mist-600 mb-2">target level</div>
-                    <div className="flex flex-col gap-1">
+                    <div className="inline-flex rounded-tile border border-ink-600 bg-ink-850 p-1 gap-1">
                       {["Junior", "Mid-Level", "Senior"].map((lvl) => (
                         <button
                           key={lvl}
+                          type="button"
                           onClick={() => setLevelHint(lvl)}
                           className={cx(
-                            "rounded-tile px-3 py-2 text-[13px] font-semibold text-left transition duration-150",
-                            levelHint === lvl ? "bg-brand text-white" : "text-mist-400 hover:text-paper"
+                            "rounded-lg px-3 py-1.5 text-[12px] font-semibold transition duration-150",
+                            levelHint === lvl
+                              ? "bg-brand text-white shadow-sm"
+                              : "text-mist-400 hover:text-paper hover:bg-ink-800/60"
                           )}
-                        >{lvl}</button>
+                        >
+                          {lvl}
+                        </button>
                       ))}
                     </div>
                   </div>
