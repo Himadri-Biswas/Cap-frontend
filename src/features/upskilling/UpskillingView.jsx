@@ -741,27 +741,24 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-3 space-y-1.5">
+                    <div className="mt-3 space-y-2">
                       {resumeSkills.length === 0 && (
                         <div className="text-xs text-mist-500">No skills were extracted from this profile.</div>
                       )}
-                      {resumeSkills.slice(0, 10).map((s, idx) => (
-                        <div key={s.canonical_name} className="flex items-center gap-2">
-                          <span
-                            className={cx(
-                              "shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
-                              skillTone(idx)
-                            )}
-                          >
+                      {resumeSkills.slice(0, 10).map((s) => (
+                        <div key={s.canonical_name} className="flex items-center gap-3 py-0.5">
+                          <div className="w-40 shrink-0 truncate text-[12px] font-medium text-paper" title={s.canonical_name}>
                             {s.canonical_name}
-                          </span>
-                          <div className="h-1.5 flex-1 rounded-full bg-ink-750">
+                          </div>
+                          <div className="h-2 flex-1 rounded-full bg-ink-750 overflow-hidden border border-ink-600/30">
                             <div
-                              className="h-1.5 rounded-full bg-brand"
+                              className="h-full rounded-full bg-gradient-to-r from-brand to-teal-400 transition-all duration-500"
                               style={{ width: `${(s.proficiency_score / 5) * 100}%` }}
                             />
                           </div>
-                          <span className="w-8 text-right text-[11px] text-mist-500">{s.proficiency_score}/5</span>
+                          <span className="w-8 shrink-0 text-right text-[11px] font-mono font-semibold text-mist-400">
+                            {s.proficiency_score}/5
+                          </span>
                         </div>
                       ))}
                     </div>
