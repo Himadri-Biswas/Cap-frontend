@@ -1,10 +1,22 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0b0c10" />
+    <meta name="theme-color" content="#0b0c10" id="meta-theme-color" />
+    <!-- Reads stored preference before first paint so there is no flash. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("tp-theme") || "dark";
+          document.documentElement.setAttribute("data-theme", t);
+          var tc = t === "light" ? "#f0f2f7" : "#0b0c10";
+          document.getElementById("meta-theme-color").content = tc;
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
     <meta
       name="description"
       content="TalentPulse — bias-audited candidate ranking, attrition risk with counterfactual interventions, and learning paths."

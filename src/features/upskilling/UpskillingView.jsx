@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Database, History, Loader2, Sparkles } from "lucide-react";
+import {
+  AlertCircle, BarChart3, Brain, Briefcase, Check, ChevronDown,
+  Code2, Cpu, Database, FlaskConical, History, Layers, Loader2,
+  Search, Server, Sparkles, Target, TrendingUp, Users,
+} from "lucide-react";
 import Button from "../../components/ui/Button.jsx";
 import { cx } from "../../lib/cx.js";
 import { skillTone } from "../../lib/skillTone.js";
@@ -30,6 +34,32 @@ function buildJdText(job) {
   return lines.join("\n");
 }
 
+// Ordered: most-specific rule first so "Data Platform" hits Server before BarChart3
+const DEPT_ICON_RULES = [
+  [/infra|devops|platform|ops/i,      Server],
+  [/ai|ml|machine/i,                  Brain],
+  [/cse|software|engineer/i,          Cpu],
+  [/data|analytic/i,                  BarChart3],
+  [/it\b|tech/i,                      Code2],
+  [/hr|people|human/i,                Users],
+  [/product/i,                        Layers],
+  [/research|science/i,               FlaskConical],
+  [/finance|account/i,                TrendingUp],
+  [/sales|market/i,                   Target],
+];
+function getDeptIcon(dept = "") {
+  const Rule = DEPT_ICON_RULES.find(([re]) => re.test(dept));
+  const Icon = Rule ? Rule[1] : Briefcase;
+  return <Icon className="h-4 w-4 shrink-0 text-mist-500" aria-hidden="true" />;
+}
+
+const AVATAR_PALETTE = ["#5B6BF5","#0EA66B","#F59E0B","#EF4444","#8B5CF6","#06B6D4","#F97316","#EC4899","#14B8A6","#64748B"];
+function avatarBg(name = "") {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+}
+
 const CRITICALITY_TONE = {
   required: "border-risk/35 bg-risk/12 text-risk",
   strong: "border-ink-500 bg-ink-750 text-mist-200",
@@ -48,6 +78,11 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
   const [customJobDescription, setCustomJobDescription] = useState("");
   const [customJobChecked, setCustomJobChecked] = useState(false);
   const [levelHint, setLevelHint] = useState("Mid-Level");
+  const [jobSearch, setJobSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [empSearch, setEmpSearch] = useState("");
+  const [empDeptFilter, setEmpDeptFilter] = useState("all");
+  const [empPage, setEmpPage] = useState(1);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -185,6 +220,55 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
     return employees.filter((e) => `${e.name} ${e.JobRole} ${e.email}`.toLowerCase().includes(q));
   }, [employees, search]);
 
+  // Job panel: local search + dept filter + grouped by department
+  const allDepts = useMemo(() => {
+    const s = new Set(upskillingTargetJobs.map((j) => j.dept).filter(Boolean));
+    return Array.from(s).sort();
+  }, [upskillingTargetJobs]);
+
+  const filteredJobList = useMemo(() => {
+    const q = jobSearch.trim().toLowerCase();
+    return upskillingTargetJobs.filter((j) => {
+      const matchQ = !q || `${j.title} ${j.dept}`.toLowerCase().includes(q);
+      const matchDept = deptFilter === "all" || j.dept === deptFilter;
+      return matchQ && matchDept;
+    });
+  }, [upskillingTargetJobs, jobSearch, deptFilter]);
+
+  const groupedJobs = useMemo(() => {
+    const map = {};
+    for (const j of filteredJobList) {
+      const key = j.dept || "Other";
+      (map[key] = map[key] || []).push(j);
+    }
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
+  }, [filteredJobList]);
+
+  // Employee panel: local search + dept filter + pagination
+  const empAllDepts = useMemo(() => {
+    const s = new Set(employees.map((e) => e.Department).filter(Boolean));
+    return Array.from(s).sort();
+  }, [employees]);
+
+  const EMP_PAGE_SIZE = 10;
+
+  const filteredEmployeeList = useMemo(() => {
+    setEmpPage(1);
+    const q = empSearch.trim().toLowerCase();
+    return employees.filter((e) => {
+      const matchQ = !q || `${e.name} ${e.JobRole} ${e.Department}`.toLowerCase().includes(q);
+      const matchDept = empDeptFilter === "all" || e.Department === empDeptFilter;
+      return matchQ && matchDept;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employees, empSearch, empDeptFilter]);
+
+  const empTotalPages = Math.max(1, Math.ceil(filteredEmployeeList.length / EMP_PAGE_SIZE));
+  const pagedEmployeeList = filteredEmployeeList.slice(
+    (empPage - 1) * EMP_PAGE_SIZE,
+    empPage * EMP_PAGE_SIZE
+  );
+
   const gaps = result?.gap_analysis?.gaps || [];
   const learningPath = result?.learning_path?.learning_path || [];
   const resumeSkills = result?.resume_skills || [];
@@ -250,46 +334,98 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
             </div>
 
             {jobMode === "select" ? (
-              <div className="mt-3 flex-1 space-y-3 overflow-y-auto pr-1">
-                {jobList.map((j) => {
-                  const active = j.id === targetJobId;
-                  return (
-                    <button
-                      key={j.id}
-                      onClick={() => {
-                        setTargetJobId(j.id);
-                        resetResult();
-                      }}
-                      className={cx(
-                        "w-full rounded-tile border p-4 text-left transition duration-150",
-                        active
-                          ? "border-brand/45 bg-brand/8 ring-2 ring-brand/25"
-                          : "border-ink-600 bg-ink-800 hover:border-ink-400 hover:bg-ink-750"
-                      )}
+              <>
+                {/* Search + dept filter */}
+                <div className="mt-3 flex gap-2">
+                  <div className="flex flex-1 items-center gap-2 rounded-tile border border-ink-600 bg-ink-850 px-2.5 h-8 focus-within:border-brand/50 transition-colors">
+                    <Search className="h-3.5 w-3.5 shrink-0 text-mist-600" aria-hidden="true" />
+                    <input
+                      value={jobSearch}
+                      onChange={(e) => setJobSearch(e.target.value)}
+                      placeholder={`Search ${deptFilter === "all" ? upskillingTargetJobs.length : filteredJobList.length} job titles…`}
+                      aria-label="Search job titles"
+                      className="min-w-0 flex-1 bg-transparent text-[12px] text-paper outline-none placeholder:text-mist-600"
+                    />
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={deptFilter}
+                      onChange={(e) => setDeptFilter(e.target.value)}
+                      className="h-8 appearance-none rounded-tile border border-ink-600 bg-ink-850 pl-2.5 pr-6 text-[12px] text-paper outline-none focus:border-brand/50 transition-colors cursor-pointer"
                     >
-                      <div className="font-semibold text-paper">{j.title}</div>
-                    </button>
-                  );
-                })}
-              </div>
+                      <option value="all">All depts</option>
+                      {allDepts.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-mist-500" aria-hidden="true" />
+                  </div>
+                </div>
+
+                {/* Grouped job list */}
+                <div className="mt-2 flex-1 overflow-y-auto pr-1 space-y-3">
+                  {groupedJobs.length === 0 && (
+                    <div className="py-8 text-center text-xs text-mist-600">No jobs match.</div>
+                  )}
+                  {groupedJobs.map(([dept, deptJobs]) => (
+                    <div key={dept}>
+                      <div className="mb-1.5 flex items-center justify-between px-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-mist-600">{dept}</span>
+                        <span className="text-[10px] text-mist-600">{deptJobs.length}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {deptJobs.map((j) => {
+                          const isActive = j.id === targetJobId;
+                          return (
+                            <button
+                              key={j.id}
+                              onClick={() => { setTargetJobId(j.id); resetResult(); }}
+                              className={cx(
+                                "w-full flex items-center gap-3 rounded-tile border px-3 py-2.5 text-left transition duration-150",
+                                isActive
+                                  ? "border-brand/45 bg-brand/8 ring-1 ring-brand/25"
+                                  : "border-ink-600 bg-ink-800 hover:border-ink-400 hover:bg-ink-750"
+                              )}
+                            >
+                              {getDeptIcon(dept)}
+                              <span className="flex-1 text-[13px] font-semibold text-paper">{j.title}</span>
+                              <div className={cx(
+                                "h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors",
+                                isActive ? "border-brand bg-brand" : "border-ink-500"
+                              )}>
+                                {isActive && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="mt-3 flex-1 flex flex-col gap-3">
-                <textarea
-                  value={customJobDescription}
-                  onChange={(e) => {
-                    setCustomJobDescription(e.target.value);
-                    setCustomJobChecked(false);
-                    resetResult();
-                  }}
-                  rows={5}
-                  className="w-full flex-1 min-h-[220px] resize-none rounded-tile border border-ink-600 bg-ink-800 p-3 text-sm text-paper outline-none placeholder:text-mist-600 focus:border-brand/35"
-                  placeholder="Write job description (responsibilities, required skills, tools, experience)…"
-                />
-
+                <div className="flex flex-1 flex-col">
+                  <textarea
+                    value={customJobDescription}
+                    onChange={(e) => {
+                      setCustomJobDescription(e.target.value);
+                      setCustomJobChecked(false);
+                      resetResult();
+                    }}
+                    rows={5}
+                    className="w-full flex-1 min-h-[220px] resize-none rounded-tile border border-ink-600 bg-ink-800 p-3 text-sm text-paper outline-none placeholder:text-mist-600 focus:border-brand/35 transition-colors"
+                    placeholder="Write job description (responsibilities, required skills, tools, experience)…"
+                  />
+                  <div className="mt-1.5 flex items-center justify-between px-0.5">
+                    <span className={cx("text-[11px] font-medium tabular-nums", customJobDescription.length >= 40 ? "text-ok" : "text-mist-500")}>
+                      {customJobDescription.length} characters
+                    </span>
+                    <span className="text-[11px] text-mist-600">Minimum 40 characters</span>
+                  </div>
+                </div>
                 <Button
                   onClick={() => setCustomJobChecked(true)}
                   className="w-full rounded-tile bg-brand hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={!customJobDescription.trim()}
+                  disabled={customJobDescription.trim().length < 40}
                 >
                   Check Now
                 </Button>
@@ -298,122 +434,153 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
           </div>
 
           <div className="h-[560px] rounded-panel border border-ink-600 bg-ink-800 p-4 flex flex-col">
+            {/* Header */}
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-paper">Select employee</div>
               {selectedEmployee && (
-                <button
-                  onClick={() => {
-                    setEmployeeId(null);
-                    resetResult();
-                  }}
-                  className="text-xs text-mist-500 hover:text-mist-200"
-                >
-                  Clear
-                </button>
+                <button onClick={() => { setEmployeeId(null); resetResult(); }} className="text-xs text-mist-500 hover:text-mist-200">Clear</button>
               )}
             </div>
-            <div className="mt-3 grid flex-1 auto-rows-min content-start gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
-              {employeeList.map((e) => {
-                const active = e.id === employeeId;
+
+            {/* Search + dept filter */}
+            <div className="mt-3 flex gap-2">
+              <div className="flex flex-1 items-center gap-2 rounded-tile border border-ink-600 bg-ink-850 px-2.5 h-8 focus-within:border-brand/50 transition-colors">
+                <Search className="h-3.5 w-3.5 shrink-0 text-mist-600" aria-hidden="true" />
+                <input
+                  value={empSearch}
+                  onChange={(e) => setEmpSearch(e.target.value)}
+                  placeholder={`Search ${empDeptFilter === "all" ? employees.length : filteredEmployeeList.length} employees…`}
+                  className="min-w-0 flex-1 bg-transparent text-[12px] text-paper outline-none placeholder:text-mist-600"
+                />
+              </div>
+              <div className="relative">
+                <select
+                  value={empDeptFilter}
+                  onChange={(e) => setEmpDeptFilter(e.target.value)}
+                  className="h-8 appearance-none rounded-tile border border-ink-600 bg-ink-850 pl-2.5 pr-6 text-[12px] text-paper outline-none focus:border-brand/50 transition-colors cursor-pointer"
+                >
+                  <option value="all">All depts</option>
+                  {empAllDepts.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-mist-500" aria-hidden="true" />
+              </div>
+            </div>
+
+            {/* Employee grid */}
+            <div className="mt-3 grid flex-1 auto-rows-min content-start gap-2.5 overflow-y-auto pr-1 sm:grid-cols-2">
+              {pagedEmployeeList.map((e) => {
+                const isActive = e.id === employeeId;
+                const initials = e.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
                 return (
                   <button
                     key={e.id}
-                    onClick={() => {
-                      setEmployeeId(e.id);
-                      resetResult();
-                    }}
+                    onClick={() => { setEmployeeId(e.id); resetResult(); }}
                     className={cx(
                       "rounded-tile border p-3 text-left transition duration-150",
-                      active
-                        ? "border-brand/45 bg-brand/8 ring-2 ring-brand/25"
+                      isActive
+                        ? "border-brand/45 bg-brand/8 ring-1 ring-brand/25"
                         : "border-ink-600 bg-ink-800 hover:border-ink-400 hover:bg-ink-750"
                     )}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="h-10 w-10 rounded-full flex items-center justify-center text-paper font-bold">
-                        {e.initials}
+                    <div className="flex items-start gap-2.5">
+                      <div
+                        className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-[13px] font-bold text-white"
+                        style={{ backgroundColor: avatarBg(e.name) }}
+                      >
+                        {initials}
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-paper">{e.name}</div>
-                        <div className="mt-1">
-                          <span className="inline-flex max-w-full truncate rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5 text-[11px] font-medium text-brand-hi">
-                            {e.JobRole}
-                          </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px] font-semibold text-paper leading-tight">{e.name}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-mist-500 leading-tight">{e.JobRole}</div>
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          <span className="inline-flex truncate max-w-full rounded-full border border-brand/30 bg-brand/10 px-2 py-px text-[10px] font-medium text-brand-hi">{e.JobRole}</span>
+                          {e.Department && (
+                            <span className="inline-flex truncate max-w-full rounded-full border border-ok/30 bg-ok/10 px-2 py-px text-[10px] font-medium text-ok">{e.Department}</span>
+                          )}
                         </div>
-                        <div className="mt-1 flex items-center gap-2">
-                          <span className="rounded-full border border-ok/30 bg-ok/12 px-2 py-0.5 text-[11px] font-medium text-ok">
-                            {e.Department}
-                          </span>
-                        </div>
+                      </div>
+                      <div className={cx(
+                        "shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors",
+                        isActive ? "border-brand bg-brand" : "border-ink-500 bg-transparent"
+                      )}>
+                        {isActive && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
                       </div>
                     </div>
                   </button>
                 );
               })}
+              {pagedEmployeeList.length === 0 && (
+                <div className="col-span-2 py-8 text-center text-xs text-mist-600">No employees match your filter.</div>
+              )}
             </div>
+
+            {/* Pagination */}
+            {empTotalPages > 1 && (
+              <div className="mt-3 flex items-center justify-between border-t border-ink-700 pt-3">
+                <span className="text-[11px] text-mist-500 num">Page {empPage} of {empTotalPages}</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={empPage === 1}
+                    onClick={() => setEmpPage((p) => p - 1)}
+                    className="flex h-7 items-center gap-1 rounded-tile border border-ink-600 bg-ink-850 px-2 text-[11px] text-mist-400 transition hover:border-ink-400 hover:text-paper disabled:cursor-not-allowed disabled:opacity-35"
+                  >‹ Prev</button>
+                  {Array.from({ length: empTotalPages }, (_, i) => i + 1)
+                    .filter((n) => n === 1 || n === empTotalPages || Math.abs(n - empPage) <= 1)
+                    .reduce((acc, n, idx, arr) => {
+                      if (idx > 0 && n - arr[idx - 1] > 1) acc.push("…");
+                      acc.push(n);
+                      return acc;
+                    }, [])
+                    .map((item, idx) =>
+                      item === "…" ? (
+                        <span key={`e-${idx}`} className="px-1 text-[11px] text-mist-600">…</span>
+                      ) : (
+                        <button
+                          key={item}
+                          onClick={() => setEmpPage(item)}
+                          className={cx(
+                            "h-7 w-7 rounded-tile border text-[11px] num transition",
+                            item === empPage
+                              ? "border-brand/50 bg-brand/15 text-brand-hi font-semibold"
+                              : "border-ink-600 bg-ink-850 text-mist-400 hover:border-ink-400 hover:text-paper"
+                          )}
+                        >{item}</button>
+                      )
+                    )}
+                  <button
+                    disabled={empPage === empTotalPages}
+                    onClick={() => setEmpPage((p) => p + 1)}
+                    className="flex h-7 items-center gap-1 rounded-tile border border-ink-600 bg-ink-850 px-2 text-[11px] text-mist-400 transition hover:border-ink-400 hover:text-paper disabled:cursor-not-allowed disabled:opacity-35"
+                  >Next ›</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {Boolean(selectedEmployee && (jobMode === "select" ? selectedTargetJob : customJobChecked)) && (
           <div className="mt-4">
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-sm font-semibold text-paper">Recommended learning path</div>
-                  {saved && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-ok/35 bg-ok/12 px-2 py-0.5 text-[10px] font-semibold text-ok">
-                      <Database className="h-3 w-3" aria-hidden="true" />
-                      Saved to MongoDB
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-mist-500 mt-1">
-                  {selectedEmployee.name}: {selectedEmployee.JobRole} {"->"} {activeJobTitle}
-                </div>
-                {pastPaths.length > 0 && (
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-mist-600">
-                    <History className="h-3 w-3" aria-hidden="true" />
-                    {pastPaths.length} earlier path{pastPaths.length > 1 ? "s" : ""} for this employee
-                    {pastPaths[0]?.jobReadiness != null
-                      ? ` · last readiness ${pastPaths[0].jobReadiness}%`
-                      : ""}
-                  </div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-semibold text-paper">Recommended learning path</div>
+                {saved && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-ok/35 bg-ok/12 px-2 py-0.5 text-[10px] font-semibold text-ok">
+                    <Database className="h-3 w-3" aria-hidden="true" />
+                    Saved to MongoDB
+                  </span>
                 )}
               </div>
-
-              <div className="flex items-center gap-2">
-                <div className="inline-flex rounded-tile border border-ink-600 bg-ink-800 p-1">
-                  {["Junior", "Mid-Level", "Senior"].map((lvl) => (
-                    <button
-                      key={lvl}
-                      onClick={() => setLevelHint(lvl)}
-                      className={cx(
-                        "rounded-lg px-2.5 py-1 text-[11px] font-semibold transition",
-                        levelHint === lvl ? "bg-brand text-paper " : "text-mist-400 hover:bg-ink-750"
-                      )}
-                    >
-                      {lvl}
-                    </button>
-                  ))}
-                </div>
-                <Button
-                  onClick={handleGenerateLearningPath}
-                  className="rounded-tile bg-brand px-4 hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={loading || !canGenerate}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                      Analyzing
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
-                      {result ? "Regenerate" : "Generate Learning Path"}
-                    </>
-                  )}
-                </Button>
-              </div>
+              <Button
+                onClick={handleGenerateLearningPath}
+                className="rounded-tile bg-brand px-4 hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={loading || !canGenerate}
+              >
+                {loading ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />Analyzing</>
+                ) : (
+                  <><Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />{result ? "Regenerate" : "Generate Learning Path"}</>
+                )}
+              </Button>
             </div>
 
             {error && (
@@ -429,6 +596,47 @@ function UpskillingView({ jobs, employees, search, setSearch }) {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-4">
+
+                {/* ── Profile summary card ── */}
+                <div className="rounded-panel border border-brand/20 bg-brand/5 p-5">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-mist-600 mb-1">target role</div>
+                    <div className="text-[15px] font-bold text-brand-hi leading-snug">{activeJobTitle}</div>
+                  </div>
+                  <div className="my-4 border-t border-brand/15" />
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-mist-600 mb-2">employee</div>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-[13px] font-bold text-white"
+                        style={{ backgroundColor: avatarBg(selectedEmployee.name) }}
+                      >
+                        {selectedEmployee.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-paper leading-tight">{selectedEmployee.name}</div>
+                        <div className="text-[11px] text-mist-500 leading-tight mt-0.5">{selectedEmployee.JobRole}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="my-4 border-t border-brand/15" />
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-mist-600 mb-2">target level</div>
+                    <div className="flex flex-col gap-1">
+                      {["Junior", "Mid-Level", "Senior"].map((lvl) => (
+                        <button
+                          key={lvl}
+                          onClick={() => setLevelHint(lvl)}
+                          className={cx(
+                            "rounded-tile px-3 py-2 text-[13px] font-semibold text-left transition duration-150",
+                            levelHint === lvl ? "bg-brand text-white" : "text-mist-400 hover:text-paper"
+                          )}
+                        >{lvl}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-panel border border-ink-600 bg-ink-800 p-5">
                   <div className="text-sm font-semibold text-paper">Constraints</div>
                   <div className="mt-4 space-y-4">

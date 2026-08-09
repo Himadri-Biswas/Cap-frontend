@@ -93,7 +93,7 @@ export default function MockHRTalentDashboard() {
             search={search}
             setSearch={setSearch}
             placeholder={heading.ph}
-            showSearch={active !== "dashboard"}
+            showSearch={active !== "dashboard" && active !== "upskilling"}
             onOpenPalette={() => setPaletteOpen(true)}
             onNavigate={handleNavigate}
           />

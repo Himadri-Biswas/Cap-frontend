@@ -803,3 +803,124 @@ input[type="number"]::-webkit-inner-spin-button {
     animation: none;
   }
 }
+
+/* ==========================================================================
+   Light theme
+   Overrides every CSS custom property that was tuned for the dark chassis.
+   Because Tailwind v4 utilities reference these via var(), all bg-ink-*,
+   text-mist-*, text-paper etc. automatically pick up the new values without
+   touching any component code.
+   ========================================================================== */
+
+html[data-theme="light"] {
+  color-scheme: light;
+
+  /* Chassis — inverted: the "deep recess" is the lightest tint, the
+     "page canvas" is a soft grey, and panels are white cards. */
+  --color-ink-950: #e8eaf2;
+  --color-ink-900: #f0f2f7;
+  --color-ink-850: #e8eaf5;
+  --color-ink-800: #ffffff;
+  --color-ink-750: #f4f5fb;
+  --color-ink-700: #eceef8;
+  --color-ink-600: #dde0ed;
+  --color-ink-500: #c5c9db;
+  --color-ink-400: #9fa4b8;
+
+  /* Text ramp — paper becomes near-black; mist steps become progressively
+     lighter (they are shadows of the heading colour, not of white). */
+  --color-paper:    #1a1c28;
+  --color-mist-200: #2d3044;
+  --color-mist-400: #4e5268;
+  --color-mist-500: #636880;
+  --color-mist-600: #808599;
+  --color-mist-700: #a3a8bd;
+
+  /* Semantic colours — same hues, darkened for readability on a light field.
+     The `*-dim` variants flip to light washes used as tinted backgrounds. */
+  --color-raw:      #b87000;
+  --color-raw-dim:  #fff7e6;
+  --color-fair:     #0a8272;
+  --color-fair-dim: #e2faf7;
+  --color-brand:    #5448e8;
+  --color-brand-hi: #3d30c8;
+  --color-brand-dim:#eeeaff;
+  --color-risk:     #c4162d;
+  --color-risk-dim: #ffe6ea;
+  --color-ok:       #0d9450;
+  --color-ok-dim:   #e0f8ec;
+
+  /* Shadows — much lighter on a light field; the current values (0.55 alpha)
+     are tuned so they barely register on charcoal. On white they'd be heavy. */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px -8px rgba(0,0,0,0.09);
+  --shadow-lift: 0 1px 3px rgba(0,0,0,0.07), 0 14px 32px -14px rgba(0,0,0,0.13);
+  --shadow-pop:  0 20px 50px -16px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.07);
+}
+
+/* The panel's top highlight is a white shimmer on dark — flip to a faint
+   dark hairline on light so it still reads as a lifted edge. */
+html[data-theme="light"] .panel::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0,0,0,0.045) 20%,
+    rgba(0,0,0,0.045) 80%,
+    transparent
+  );
+}
+
+/* Feature panels are hardcoded gradients, not tokens, so they need a full
+   retheme. Light version: soft lavender-to-white wash instead of dark indigo. */
+html[data-theme="light"] .feature {
+  border-color: #ccc9f5;
+  background:
+    radial-gradient(110rem 46rem at 8% -35%, rgba(84,72,232,0.09),  transparent 62%),
+    radial-gradient(85rem  40rem at 96% -15%, rgba(10,130,114,0.07), transparent 58%),
+    linear-gradient(165deg, #f3f1ff 0%, #f8f7ff 48%, #ffffff 100%);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,0.8) inset,
+    0 24px 56px -20px rgba(84,72,232,0.07);
+  color: #1a1c28;
+}
+
+html[data-theme="light"] .feature::before {
+  background-image:
+    linear-gradient(rgba(60,48,190,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60,48,190,0.04) 1px, transparent 1px);
+}
+
+html[data-theme="light"] .feature-dim   { color: rgba(26,28,40,0.80); }
+html[data-theme="light"] .feature-faint { color: rgba(26,28,40,0.54); }
+
+html[data-theme="light"] .feature-well {
+  background:   rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.09);
+}
+
+/* Data tables embedded in a feature panel use rgba-white overrides
+   that look wrong on a near-white feature background. */
+html[data-theme="light"] .feature .data-table {
+  --tbl-tint:  rgba(0,0,0,0.03);
+  --tbl-hover: rgba(0,0,0,0.025);
+}
+html[data-theme="light"] .feature .data-table thead th {
+  border-bottom-color: rgba(0,0,0,0.10);
+}
+html[data-theme="light"] .feature .data-table tbody td {
+  border-bottom-color: rgba(0,0,0,0.07);
+  color: rgba(26,28,40,0.86);
+}
+
+/* Gridlines used on the hero auth page — swap invisible rgba-white
+   lines for soft rgba-dark lines that read on a light surface. */
+html[data-theme="light"] .gridlines {
+  background-image:
+    linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+}
+
+/* The dark-mode trick of inverting the calendar icon is not needed
+   on a light field — the native icon is already the right colour. */
+html[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}

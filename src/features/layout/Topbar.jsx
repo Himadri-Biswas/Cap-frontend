@@ -2,6 +2,7 @@ import React from "react";
 import { Search } from "lucide-react";
 import NotificationBell from "../notifications/NotificationBell.jsx";
 import UserMenu from "./UserMenu.jsx";
+import ThemeToggle from "../../components/ui/ThemeToggle.jsx";
 import { cx } from "../../lib/cx.js";
 
 /**
@@ -62,6 +63,7 @@ function Topbar({
           </button>
 
           {actions}
+          <ThemeToggle />
           <NotificationBell onNavigate={onNavigate} />
           <UserMenu />
         </div>
