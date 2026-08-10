@@ -149,7 +149,7 @@ function SimpleDashboard({ jobs = [], employees = [], onNavigate }) {
                     />
                   ))}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-4">
+                <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
                   {bands.map((band) => {
                     let colorClasses = "";
                     if (band.key === "Critical") colorClasses = "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]";
