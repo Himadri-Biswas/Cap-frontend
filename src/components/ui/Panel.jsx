@@ -79,7 +79,7 @@ export function Stat({ label, value, unit, tone = "paper", hint, icon: Icon, ind
     <div className="panel panel-hit p-4 enter" style={{ "--i": index }}>
       <div className="flex items-start justify-between gap-2">
         <span className="eyebrow">{label}</span>
-        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-mist-600" aria-hidden="true" /> : null}
+        {Icon ? <Icon className={cx("h-3.5 w-3.5 shrink-0", tone === "paper" ? "text-mist-600" : toneClass)} aria-hidden="true" /> : null}
       </div>
       <div className={cx("num mt-2 text-2xl font-semibold tracking-tight", toneClass)}>
         {value}

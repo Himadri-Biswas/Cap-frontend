@@ -149,23 +149,28 @@ function SimpleDashboard({ jobs = [], employees = [], onNavigate }) {
                     />
                   ))}
                 </div>
-                <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2.5">
-                  {bands.map((band) => (
-                    <div key={band.key} className="flex items-center gap-2 border-b border-white/10 pb-2">
-                      <span
-                        aria-hidden="true"
-                        className={cx(
-                          "h-2 w-2 shrink-0 rounded-full",
-                          band.tone === "risk" ? "bg-[#ff7a8f]" : band.tone === "raw" ? "bg-[#f0b429]" : "bg-[#34d399]"
-                        )}
-                        style={{ opacity: band.key === "High" ? 0.62 : 1 }}
-                      />
-                      <dt className="flex-1 text-xs feature-dim">{band.label}</dt>
-                      <dd className="num text-xs font-semibold text-white">{band.count}</dd>
-                      <dd className="num w-10 text-right text-[11px] feature-faint">{Math.round(band.share)}%</dd>
-                    </div>
-                  ))}
-                </dl>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-4">
+                  {bands.map((band) => {
+                    let colorClasses = "";
+                    if (band.key === "Critical") colorClasses = "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]";
+                    else if (band.key === "High") colorClasses = "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]";
+                    else if (band.key === "Medium") colorClasses = "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]";
+                    else colorClasses = "bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.6)]";
+
+                    return (
+                      <div key={band.key}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={cx("w-2 h-2 rounded-full", colorClasses)}></span>
+                          <span className="text-sm text-mist-200">{band.label}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-lg font-semibold text-paper">{band.count}</span>
+                          <span className="text-xs text-mist-500">{Math.round(band.share)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </>
             ) : (
               <div className="feature-well p-5 text-xs leading-5 feature-dim">
@@ -186,6 +191,7 @@ function SimpleDashboard({ jobs = [], employees = [], onNavigate }) {
           value={data?.stats.totalEmployees ?? "—"}
           icon={Users}
           hint={data ? `${data.stats.formerEmployees} former` : ""}
+          tone="brand"
         />
         <Stat
           index={2}
@@ -193,13 +199,14 @@ function SimpleDashboard({ jobs = [], employees = [], onNavigate }) {
           value={data?.stats.openPositions ?? "—"}
           icon={BriefcaseBusiness}
           hint={data ? `${data.stats.totalApplications} applications` : ""}
+          tone="raw"
         />
         <Stat
           index={3}
           label="New applications"
           value={data?.stats.newApplications ?? "—"}
           icon={FileText}
-          tone="brand"
+          tone="risk"
           hint="last 7 days"
         />
         <Stat
