@@ -24,8 +24,27 @@ import { api } from "../lib/api.js";
  */
 
 export default function MockHRTalentDashboard() {
-  const [active, setActive] = useState("dashboard");
+  const validViews = ["dashboard", "employees", "recruitment", "upskilling", "people"];
+  const [active, setActive] = useState(() => {
+    const hash = window.location.hash.replace("#", "");
+    return validViews.includes(hash) ? hash : "dashboard";
+  });
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    window.location.hash = active;
+  }, [active]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (validViews.includes(hash)) {
+        setActive(hash);
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   const [jobs, setJobs] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -93,7 +112,7 @@ export default function MockHRTalentDashboard() {
             search={search}
             setSearch={setSearch}
             placeholder={heading.ph}
-            showSearch={active !== "dashboard" && active !== "upskilling"}
+            showSearch={active !== "dashboard" && active !== "upskilling" && active !== "recruitment"}
             onOpenPalette={() => setPaletteOpen(true)}
             onNavigate={handleNavigate}
           />

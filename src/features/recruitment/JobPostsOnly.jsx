@@ -4,11 +4,16 @@ import {
   ArrowRight,
   ArrowUp,
   Ban,
+  Briefcase,
+  Calendar,
   CheckCircle2,
   ChevronDown,
+  Clock,
   Eye,
+  FlaskConical,
   Loader2,
   Mail,
+  MapPin,
   Minus,
   Play,
   Plus,
@@ -18,6 +23,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
+  Users,
   XCircle,
 } from "lucide-react";
 import Pill from "../../components/ui/Pill.jsx";
@@ -38,6 +44,20 @@ import { cx } from "../../lib/cx.js";
 import { api } from "../../lib/api.js";
 
 const MODULE1_API_URL = import.meta.env.VITE_MODULE1_API_URL || "https://ijsasif-module-1-skill-extractor.hf.space";
+
+const LocationIcon = ({ location, className }) => {
+  const locLower = (location || "").toLowerCase();
+  const isRemote = locLower.includes("remote");
+  const isHybrid = locLower.includes("hybrid");
+  if (isRemote) {
+    return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>;
+  }
+  if (isHybrid) {
+    return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>;
+  }
+  // Default to On-site for specific city/country names
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>;
+};
 
 /**
  * AI verdict bands, applied to the FAIR (post-debiasing) score.
@@ -188,7 +208,7 @@ function getSkillSections(skillPayload) {
 const TH = ({ children, align = "left", className = "" }) => (
   <th
     className={cx(
-      align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left",
+      align === "right" ? "!text-right" : align === "center" ? "!text-center" : "!text-left",
       className
     )}
   >
@@ -278,7 +298,7 @@ function PagedList({ items, row, step = PAGE_STEP, resetKey, className = "space-
   );
 }
 
-function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob }) {
+function JobPostsOnly({ jobs, search, setSearch, focusJobId = null, onJobsChanged, onNewJob }) {
   /**
    * Three separate screens rather than one long scroll:
    *   "list"      — the job postings
@@ -296,6 +316,12 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
   const [jobError, setJobError] = useState("");
   const [jobNotice, setJobNotice] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Filter and Sort for jobs list
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [sortConfig, setSortConfig] = useState("Recent");
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
 
   // ── Applications loaded from MongoDB for the selected job ────────────────
   const [applicants, setApplicants] = useState([]);
@@ -346,6 +372,24 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
     return candidate === required || candidate.includes(required) || required.includes(candidate);
   };
 
+  /**
+   * A posting is closed either because its deadline passed or because an admin
+   * stopped it. Both need to read the same on this screen and on the
+   * applicant's, so `status` is part of the test, not just the date.
+   */
+  const jobState = (job) => {
+    const deadlinePassed = deadlineUTC(job.deadline) < now;
+    const stopped = job.status && job.status !== "open";
+    return { deadlinePassed, stopped, isClosed: deadlinePassed || stopped };
+  };
+
+  const statusPill = (job) => {
+    const { deadlinePassed, stopped } = jobState(job);
+    if (stopped) return { label: "Stopped", cls: "bg-raw/12 text-raw border-raw/35", icon: Ban };
+    if (deadlinePassed) return { label: "Closed", cls: "bg-risk/12 text-risk border-risk/35", icon: XCircle };
+    return { label: "Ongoing", cls: "bg-brand/12 text-brand-hi border-brand/35", icon: CheckCircle2 };
+  };
+
   // Counts now come from the denormalised counter MongoDB keeps on each job.
   const getApplicantCount = (jobId) => {
     if (selectedJobId === jobId && applicants.length) return applicants.length;
@@ -366,21 +410,47 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
     };
   };
 
+  const jobCounts = useMemo(() => {
+    let ongoing = 0;
+    let closed = 0;
+    let stopped = 0;
+    jobs.forEach(job => {
+      const { stopped: isStopped, deadlinePassed } = jobState(job);
+      if (isStopped) stopped++;
+      else if (deadlinePassed) closed++;
+      else ongoing++;
+    });
+    return { ongoing, closed, stopped };
+  }, [jobs, now]);
+
   const filteredJobs = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const base = !query
+    let base = !query
       ? jobs
       : jobs.filter((job) => `${job.title} ${job.dept} ${job.location}`.toLowerCase().includes(query));
+
+    if (statusFilter !== "All") {
+      base = base.filter((job) => {
+        const { stopped: isStopped, deadlinePassed } = jobState(job);
+        if (statusFilter === "Stopped" && isStopped) return true;
+        if (statusFilter === "Closed" && !isStopped && deadlinePassed) return true;
+        if (statusFilter === "Ongoing" && !isStopped && !deadlinePassed) return true;
+        return false;
+      });
+    }
 
     return base
       .slice()
       .sort((a, b) => {
-        const aClosed = deadlineUTC(a.deadline) < now;
-        const bClosed = deadlineUTC(b.deadline) < now;
-        if (aClosed !== bClosed) return aClosed ? 1 : -1;
+        if (sortConfig === "ApplicantsHigh") {
+          return (b.applicantCount || 0) - (a.applicantCount || 0);
+        } else if (sortConfig === "ApplicantsLow") {
+          return (a.applicantCount || 0) - (b.applicantCount || 0);
+        }
+        // Recent
         return deadlineUTC(b.deadline) - deadlineUTC(a.deadline);
       });
-  }, [jobs, search]);
+  }, [jobs, search, statusFilter, sortConfig, now]);
 
   useEffect(() => {
     if (selectedJobId && !filteredJobs.find((job) => job.id === selectedJobId)) {
@@ -534,24 +604,6 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
     applicantsById.byName.get((candidate?.name || "").trim().toLowerCase()) ||
     null;
 
-  /**
-   * A posting is closed either because its deadline passed or because an admin
-   * stopped it. Both need to read the same on this screen and on the
-   * applicant's, so `status` is part of the test, not just the date.
-   */
-  const jobState = (job) => {
-    const deadlinePassed = deadlineUTC(job.deadline) < now;
-    const stopped = job.status && job.status !== "open";
-    return { deadlinePassed, stopped, isClosed: deadlinePassed || stopped };
-  };
-
-  const statusPill = (job) => {
-    const { deadlinePassed, stopped } = jobState(job);
-    if (stopped) return { label: "Stopped", cls: "bg-raw/12 text-raw border-raw/35", icon: Ban };
-    if (deadlinePassed) return { label: "Closed", cls: "bg-risk/12 text-risk border-risk/35", icon: XCircle };
-    return { label: "Ongoing", cls: "bg-brand/12 text-brand-hi border-brand/35", icon: CheckCircle2 };
-  };
-
   async function runJobAction(jobId, action) {
     setJobBusyId(jobId);
     setJobError("");
@@ -673,67 +725,152 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
     withdrawn: "border-ink-600 bg-ink-750 text-mist-500",
   };
 
-  // ── Post-a-job entry point (used to be the "+ New" button in the header) ──
-  const PostJobPanel = () => (
-    <div className="rounded-panel border border-ink-600 bg-ink-800 p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-tile bg-brand text-white">
-            <Plus className="h-5 w-5" aria-hidden="true" />
+  const JobList = () => (
+    <div className="rounded-2xl border border-white/5 bg-ink-900/60 p-8 shadow-xl backdrop-blur-md">
+      <div className="mb-8 flex flex-col gap-6 border-b border-ink-800 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        
+        {/* Header Left */}
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-brand/20 bg-brand/10 text-brand shadow-[0_0_15px_rgba(99,102,241,0.15)]">
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
           </div>
           <div>
-            <div className="text-base font-semibold tracking-tight text-paper">Post a job opening</div>
-            <div className="mt-1 text-xs leading-5 text-mist-500">
-              Upload or paste a job description. Required skills are extracted from it.
+            <h3 className="mb-2 font-display text-2xl font-bold text-white">Current Job Postings</h3>
+            <div className="flex items-center gap-3 text-sm text-mist-400">
+              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-brand"></span> {jobCounts.ongoing} Ongoing</span>
+              <span>•</span>
+              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-risk"></span> {jobCounts.closed} Closed</span>
+              <span>•</span>
+              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-raw"></span> {jobCounts.stopped} Stopped</span>
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => onNewJob?.()}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-tile bg-brand px-5 py-2.5 text-sm font-semibold text-paper transition hover:bg-brand"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          New job posting
-        </button>
-      </div>
-    </div>
-  );
 
-  const JobList = () => (
-    <div className="rounded-panel border border-ink-600 bg-ink-800 p-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold text-paper">Latest Job Posts</div>
-        <Pill className="border border-ink-600 bg-ink-750 text-mist-200">{filteredJobs.length} job posts</Pill>
+        {/* Header Right: Filters & Action */}
+        <div className="flex flex-wrap items-center gap-4">
+          
+          {/* Search Bar */}
+          <div className="relative w-64">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <svg className="h-4 w-4 text-mist-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+            <input
+              type="text"
+              className="block w-full rounded-lg border border-ink-700 bg-ink-900 py-1.5 pl-9 pr-3 text-sm text-paper placeholder-mist-500 shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+              placeholder="Title, department or location"
+              value={search}
+              onChange={(e) => setSearch && setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="relative flex items-center rounded-lg border border-ink-700 bg-ink-900 p-1 shadow-sm">
+            {/* Filter Dropdown */}
+            <div className="relative">
+              <button 
+                type="button"
+                onClick={() => { setFilterMenuOpen(!filterMenuOpen); setSortMenuOpen(false); }}
+                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-mist-400 transition hover:text-paper"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                <span>Filter: {statusFilter}</span>
+              </button>
+              {filterMenuOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-[150px] rounded-lg border border-ink-600 bg-ink-800 py-1 shadow-lg">
+                  {["All", "Ongoing", "Closed", "Stopped"].map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => { setStatusFilter(opt); setFilterMenuOpen(false); }}
+                      className={cx("block w-full px-4 py-2 text-left text-xs transition", statusFilter === opt ? "bg-brand/10 text-brand" : "text-mist-400 hover:bg-ink-750 hover:text-paper")}
+                    >
+                      {opt === "All" ? "All Statuses" : `${opt} Only`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="h-4 w-px bg-ink-700"></div>
+            
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <button 
+                type="button"
+                onClick={() => { setSortMenuOpen(!sortMenuOpen); setFilterMenuOpen(false); }}
+                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-mist-400 transition hover:text-paper"
+              >
+                <span>Sort: {sortConfig === "Recent" ? "Recent Deadline" : sortConfig === "ApplicantsHigh" ? "Most Applicants" : "Least Applicants"}</span>
+                <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              {sortMenuOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-[150px] rounded-lg border border-ink-600 bg-ink-800 py-1 shadow-lg">
+                  {[
+                    { val: "Recent", label: "Recent Deadline" },
+                    { val: "ApplicantsHigh", label: "Most Applicants" },
+                    { val: "ApplicantsLow", label: "Least Applicants" }
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      onClick={() => { setSortConfig(opt.val); setSortMenuOpen(false); }}
+                      className={cx("block w-full px-4 py-2 text-left text-xs transition", sortConfig === opt.val ? "bg-brand/10 text-brand" : "text-mist-400 hover:bg-ink-750 hover:text-paper")}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onNewJob?.()}
+            className="flex items-center gap-2 rounded-lg border border-brand/50 bg-brand px-4 py-2.5 text-sm font-bold text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] transition-colors hover:bg-brand-hi"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            New Post
+          </button>
+        </div>
       </div>
 
       {jobNotice && (
-        <div className="mt-3 flex items-start gap-2 rounded-tile border border-ok/35 bg-ok/12 p-3">
+        <div className="mb-4 flex items-start gap-2 rounded-tile border border-ok/35 bg-ok/12 p-3">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-ok" aria-hidden="true" />
           <div className="flex-1 text-xs text-ok">{jobNotice}</div>
-          <button onClick={() => setJobNotice("")} className="text-xs font-semibold text-ok">
-            Dismiss
-          </button>
+          <button onClick={() => setJobNotice("")} className="text-xs font-semibold text-ok">Dismiss</button>
         </div>
       )}
       {jobError && (
-        <div className="mt-3 rounded-tile border border-risk/35 bg-risk/12 p-3 text-xs text-risk">{jobError}</div>
+        <div className="mb-4 rounded-tile border border-risk/35 bg-risk/12 p-3 text-xs text-risk">{jobError}</div>
       )}
 
-      <div className="mt-3">
+      {filteredJobs.length === 0 ? (
+        <div className="p-8 text-center text-sm font-semibold text-mist-500">No job postings found matching this filter.</div>
+      ) : (
         <PagedList
           items={filteredJobs}
-          resetKey={`${search}:${filteredJobs.length}`}
+          resetKey={`${search}:${statusFilter}:${sortConfig}`}
           row={(job) => {
             const status = statusPill(job);
-            const Icon = status.icon;
             const { stopped, deadlinePassed } = jobState(job);
             const busy = jobBusyId === job.id;
+            
+            let statusCls = "border-brand/20 bg-brand/10 text-brand-hi";
+            if (stopped) statusCls = "border-raw/20 bg-raw/10 text-raw";
+            else if (deadlinePassed) statusCls = "border-risk/20 bg-risk/10 text-risk";
+
+            const actionLabel = stopped ? "Reopen" : "Stop posting";
+            let actionBtnCls = stopped 
+              ? "border border-ok/35 bg-ok/12 text-ok hover:bg-ok/20" 
+              : "border border-raw/35 bg-raw/10 text-raw hover:bg-raw/20";
+              
+            if (deadlinePassed) {
+              actionBtnCls += " opacity-50 cursor-not-allowed hover:bg-transparent";
+            }
 
             return (
               <div
                 key={job.id}
-                className="rounded-tile border border-ink-600 bg-ink-800 transition hover:border-brand/35 hover:"
+                className="group relative mb-3 rounded-xl border border-ink-600 bg-ink-800 transition hover:border-brand/30"
               >
                 <button
                   type="button"
@@ -743,81 +880,79 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                     setView("job");
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
-                  className="w-full p-3 text-left"
+                  className="w-full cursor-pointer p-4 text-left"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1 h-10 w-1.5 rounded-full bg-ink-700" />
+                    <div className="flex items-stretch gap-3">
+                      <div className="my-1 w-1.5 self-stretch rounded-full bg-ink-700"></div>
                       <div>
                         <div className="font-semibold text-paper">{job.title}</div>
-                        <div className="mt-1 text-xs text-mist-500">
-                          {job.dept} / {job.location}
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-mist-500">
+                          {job.dept} <span className="text-ink-600">•</span> 
+                          <LocationIcon location={job.location} className="mr-0.5 inline-block h-3.5 w-3.5" />
+                          {job.location}
                         </div>
                       </div>
                     </div>
-                    <Pill className={cx("border shrink-0", status.cls)}>
-                      <Icon className="mr-1 h-3.5 w-3.5" /> {status.label}
-                    </Pill>
+                    
+                    <span className={cx("inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider", statusCls)}>
+                      {stopped ? (
+                        <Ban className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                      ) : deadlinePassed ? (
+                        <XCircle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      {status.label}
+                    </span>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Pill className="border border-ink-600 bg-ink-750 text-mist-200">
+                  <div className="mt-4 flex gap-2">
+                    <span className="inline-flex items-center rounded-full border border-ink-600 bg-ink-750 px-2.5 py-0.5 text-xs font-semibold text-mist-200">
                       Deadline: {job.deadline}
-                    </Pill>
-                    <Pill className="border border-ink-600 bg-ink-750 text-mist-200">
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-ink-600 bg-ink-750 px-2.5 py-0.5 text-xs font-semibold text-mist-200">
                       Applicants: {getApplicantCount(job.id)}
-                    </Pill>
+                    </span>
                   </div>
                 </button>
 
-                {/* Admin controls, kept outside the row button so a click here
-                    never opens the posting by accident. */}
-                <div className="flex items-center justify-end gap-1.5 border-t border-ink-700 px-3 py-2">
+                <div className="absolute bottom-4 right-4 flex items-center gap-1.5">
                   {busy ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-mist-600" aria-hidden="true" />
+                    <div className="flex h-7 w-20 items-center justify-center">
+                      <Loader2 className="h-4 w-4 animate-spin text-mist-600" aria-hidden="true" />
+                    </div>
                   ) : (
                     <>
-                      {stopped ? (
-                        <button
-                          type="button"
-                          onClick={() => handleReopenJob(job)}
-                          disabled={deadlinePassed}
-                          title={
-                            deadlinePassed
-                              ? "The deadline has passed — extend it before reopening."
-                              : "Start accepting applications again"
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-tile border border-ok/35 bg-ok/12 px-2.5 py-1.5 text-[11px] font-bold text-ok transition hover:bg-ok/12 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Play className="h-3 w-3" aria-hidden="true" />
-                          Reopen
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleStopJob(job)}
-                          disabled={deadlinePassed}
-                          title={
-                            deadlinePassed
-                              ? "This posting already closed on its deadline."
-                              : "Stop accepting applications. Applicants will see it as closed."
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-tile border border-raw/35 bg-raw/12 px-2.5 py-1.5 text-[11px] font-bold text-raw transition hover:bg-raw/12 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Ban className="h-3 w-3" aria-hidden="true" />
-                          Stop posting
-                        </button>
-                      )}
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(e) => { e.stopPropagation(); stopped ? handleReopenJob(job) : handleStopJob(job); }}
+                        disabled={deadlinePassed}
+                        title={
+                          deadlinePassed
+                            ? "This posting's deadline has passed."
+                            : stopped ? "Start accepting applications again" : "Stop accepting applications"
+                        }
+                        className={cx("inline-flex items-center rounded-md px-2.5 py-1.5 text-[11px] font-bold transition", actionBtnCls)}
+                      >
+                        {stopped ? (
+                          <Play className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                        ) : (
+                          <Ban className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                        )}
+                        {actionLabel}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setJobError("");
                           setConfirmDelete(job);
                         }}
                         title="Delete this job posting"
-                        className="inline-flex items-center gap-1.5 rounded-tile border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[11px] font-bold text-mist-400 transition hover:border-risk/35 hover:bg-risk/12 hover:text-risk"
+                        className="inline-flex items-center rounded-md border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[11px] font-bold text-mist-400 transition hover:border-risk/35 hover:bg-risk/12 hover:text-risk"
                       >
-                        <Trash2 className="h-3 w-3" aria-hidden="true" />
+                        <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                         Delete
                       </button>
                     </>
@@ -827,7 +962,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
             );
           }}
         />
-      </div>
+      )}
     </div>
   );
 
@@ -1945,8 +2080,7 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
             accentWord="fair"
             lede="Post a role, collect CVs, then screen the whole batch twice — once by the original model and once with background removed — and compare the two."
           />
-          <PostJobPanel />
-          <JobList />
+          {JobList()}
         </div>
       )}
 
@@ -2040,8 +2174,10 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xl font-bold tracking-tight text-paper">{selected.title}</div>
-                  <div className="mt-1 text-sm text-mist-500">
-                    {selected.dept} / {selected.location}
+                  <div className="mt-1.5 flex items-center gap-1.5 text-sm text-mist-500">
+                    {selected.dept} <span className="text-ink-600">•</span> 
+                    <LocationIcon location={selected.location} className="mr-0.5 inline-block h-4 w-4 opacity-70" />
+                    {selected.location}
                   </div>
                 </div>
                 <div className="text-right">
@@ -2062,195 +2198,239 @@ function JobPostsOnly({ jobs, search, focusJobId = null, onJobsChanged, onNewJob
                 <div className="mt-2 text-sm text-mist-200">{selected.summary}</div>
               </div>
 
-              <div className="rounded-tile border border-ink-600 bg-ink-850 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-mist-200">Key skills</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {selected.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="inline-flex items-center rounded-full border border-ink-600 bg-ink-800 px-3 py-1 text-xs text-mist-200"
-                    >
-                      {skill}
-                    </span>
-                  ))}
+              <div className="flex items-center justify-between rounded-xl border border-ink-600 bg-ink-850 p-5 shadow-sm">
+                <div className="flex flex-1 items-center gap-4 px-4">
+                  <div className="rounded-lg bg-ink-800 p-2.5 text-mist-400">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-mist-500">Posted</div>
+                    <div className="mt-0.5 text-sm font-medium text-paper">{selected.created}</div>
+                  </div>
+                </div>
+
+                <div className="h-12 w-px bg-ink-600"></div>
+
+                <div className="flex flex-1 items-center gap-4 px-8">
+                  <div className="rounded-lg bg-ink-800 p-2.5 text-mist-400">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-mist-500">Deadline</div>
+                    <div className="mt-0.5 text-sm font-medium text-paper">{selected.deadline || "None"}</div>
+                  </div>
+                </div>
+
+                <div className="h-12 w-px bg-ink-600"></div>
+
+                <div className="flex flex-1 items-center gap-4 px-8">
+                  <div className="rounded-lg bg-brand/10 p-2.5 text-brand-hi shadow-sm">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-mist-500">Applicants</div>
+                    <div className="mt-0.5 text-lg font-bold tabular-nums text-paper">
+                      {getApplicantCount(selected.id)}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-tile border border-ink-600 bg-ink-850 p-4">
-                <div className="grid gap-3 text-sm md:grid-cols-3">
-                  <div>
-                    <div className="text-xs text-mist-500">Posted</div>
-                    <div className="font-semibold text-paper">{selected.created}</div>
+              <div className="relative overflow-hidden rounded-tile border border-ink-600 bg-ink-850 p-5">
+                <div className="pointer-events-none absolute -mt-16 -mr-16 right-0 top-0 h-48 w-48 rounded-full bg-brand/10 blur-3xl"></div>
+                <div className="relative z-10">
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-brand-hi"></div>
+                    <div className="text-[11px] font-bold uppercase tracking-widest text-mist-300">Key Skills</div>
                   </div>
-                  <div>
-                    <div className="text-xs text-mist-500">Deadline</div>
-                    <div className="font-semibold text-paper">{selected.deadline}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-mist-500">Applicants</div>
-                    <div className="font-semibold text-paper">{getApplicantCount(selected.id)}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {selected.skills.map((skill) => (
+                      <div
+                        key={skill}
+                        className="group flex cursor-default items-center gap-2 rounded-lg border border-ink-600 bg-ink-900/50 px-3 py-2 backdrop-blur-sm transition duration-300 hover:border-brand/50"
+                      >
+                        <div className="h-3 w-0.5 rounded-full bg-brand/50 transition group-hover:bg-brand-hi"></div>
+                        <span className="text-[13px] font-medium text-paper">{skill}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
+
+
             </div>
           </div>
 
-          <div className="rounded-panel border border-ink-600 bg-ink-800 p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-paper">Applicants</div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => loadApplicants(selectedJobId)}
-                  disabled={applicantsLoading}
-                  className="rounded-full p-1.5 text-mist-600 transition hover:bg-ink-700 hover:text-mist-200 disabled:opacity-50"
-                  title="Reload applicants"
-                >
-                  <RefreshCw className={cx("h-3.5 w-3.5", applicantsLoading && "animate-spin")} />
-                </button>
-                <Pill className="border border-ink-600 bg-ink-750 text-mist-200">
-                  {rankedApplicants.length} applicants
-                </Pill>
-              </div>
-            </div>
-
-            {rankedApplicants.length > 0 && (
-              <button
-                type="button"
-                onClick={handleScreenStoredCvs}
-                disabled={storedScreenLoading}
-                title="Send every stored CV for this job to the fair-ranking model"
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-tile bg-ink-850 px-3 py-2 text-xs font-bold text-paper transition hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {storedScreenLoading ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                    Screening {rankedApplicants.length} stored CVs…
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                    Fair-screen these {rankedApplicants.length} applicants
-                  </>
-                )}
-              </button>
-            )}
-
-            {applicantsError && (
-              <div className="mt-3 rounded-tile border border-risk/35 bg-risk/12 p-3 text-xs text-risk">
-                {applicantsError}
-              </div>
-            )}
-
-            {applicantsLoading && rankedApplicants.length === 0 ? (
-              <div className="mt-3 flex items-center justify-center gap-2 rounded-tile border border-ink-600 bg-ink-850 p-6 text-sm text-mist-500">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                Loading applicants…
-              </div>
-            ) : rankedApplicants.length === 0 ? (
-              <div className="mt-3 rounded-tile border border-ink-600 bg-ink-850 p-4 text-sm text-mist-400">
-                No applicants yet for this job.
-              </div>
-            ) : (
-              // Job details sit above; the applicants read across from here —
-              // the ranking on the left, whoever is selected on the right.
-              <div className="mt-3 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                <div className="overflow-hidden rounded-tile border border-ink-600">
-                  <table className="data-table data-table--brand w-full">
-                    <thead className="bg-ink-850">
-                      <tr className="text-left text-mist-400">
-                        <th className="w-14 px-3 py-2 font-semibold">Rank</th>
-                        <th className="font-semibold">Candidate Name</th>
-                        <th className="w-40 px-3 py-2 font-semibold">Candidate Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankedApplicants.map((candidate) => {
-                        const isActive = candidate.id === selectedCandidateId;
-                        return (
-                          <tr
-                            key={candidate.id}
-                            className={cx(
-                              "relative cursor-pointer border-t border-ink-600 transition",
-                              isActive ? "bg-brand/12" : TONE_ROW_CLASS[candidate.tone] || "hover:bg-ink-750"
-                            )}
-                            onClick={() => setSelectedCandidateId(candidate.id)}
-                          >
-                            <td className="relative px-3 py-2 font-mono text-mist-200">
-                              {/* Tone stripe: green = returning/shortlisted before, red = rejected before */}
-                              <span
-                                className={cx(
-                                  "absolute left-0 top-0 h-full w-1",
-                                  TONE_BAR_CLASS[candidate.tone] || "bg-transparent"
-                                )}
-                              />
-                              {candidate.rank}
-                            </td>
-                            <td className="">
-                              <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-bold text-paper">
-                                  {candidate.name
-                                    .split(" ")
-                                    .slice(0, 2)
-                                    .map((part) => part[0])
-                                    .join(" ")}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="truncate font-semibold text-paper">{candidate.name}</div>
-                                  {candidate.tags?.length ? (
-                                    <ApplicantTags tags={candidate.tags} size="xs" className="mt-1" />
-                                  ) : null}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="">
-                              <div className="flex items-center gap-2">
-                                <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-750">
-                                  <div
-                                    className={cx(
-                                      "h-full rounded-full transition-[width,transform] duration-500",
-                                      candidate.scoreSource && candidate.scoreSource !== "heuristic"
-                                        ? "bg-ok"
-                                        : "bg-brand"
-                                    )}
-                                    style={{ width: `${Math.round(candidate.score * 100)}%` }}
-                                  />
-                                </div>
-                                <span className="font-mono text-mist-200">{(candidate.score * 100).toFixed(0)}%</span>
-                              </div>
-                              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-mist-600">
-                                {candidate.scoreSource && candidate.scoreSource !== "heuristic" ? (
-                                  <>
-                                    <span className="font-semibold text-ok">fair model</span>
-                                    {candidate.fairRank ? <span>· rank #{candidate.fairRank}</span> : null}
-                                    {candidate.verdict ? <span>· {candidate.verdict.toLowerCase()}</span> : null}
-                                  </>
-                                ) : (
-                                  "skill match · run fair screening for the real score"
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+          <div className="mt-6 overflow-hidden rounded-xl border border-ink-600 bg-ink-850 shadow-xl">
+              <div className="flex items-center justify-between border-b border-ink-600 bg-ink-800 p-5">
+                <div className="flex items-center gap-3">
+                  <div className="text-base font-bold text-paper">Applicants</div>
                 </div>
-
-                <div
-                  className={cx(
-                    "rounded-tile border p-4",
-                    selectedCandidate?.tone === "positive"
-                      ? "border-ok/35 bg-ok/18"
-                      : selectedCandidate?.tone === "negative"
-                        ? "border-risk/35 bg-risk/18"
-                        : selectedCandidate?.tone === "mixed"
-                          ? "border-raw/35 bg-raw/18"
-                          : "border-ink-600 bg-ink-850"
+                
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => loadApplicants(selectedJobId)}
+                    disabled={applicantsLoading}
+                    className="p-1 text-mist-500 transition hover:text-paper disabled:opacity-50"
+                    title="Reload applicants"
+                  >
+                    <RefreshCw className={cx("h-4 w-4", applicantsLoading && "animate-spin")} />
+                  </button>
+                  {rankedApplicants.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleScreenStoredCvs}
+                      disabled={storedScreenLoading}
+                      className="group relative flex items-center gap-2 rounded-lg bg-ink-800 bg-clip-padding p-[1px] text-sm font-bold text-white shadow-lg transition-all hover:shadow-brand/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <div className="absolute inset-0 -z-10 rounded-lg bg-gradient-to-r from-brand to-pink-500" />
+                      <div className="flex h-full w-full items-center gap-2 rounded-lg bg-ink-800 px-4 py-2">
+                        {storedScreenLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin text-brand-hi" aria-hidden="true" />
+                            Screening {rankedApplicants.length}...
+                          </>
+                        ) : (
+                          <>
+                            <FlaskConical className="h-4 w-4 text-brand-hi group-hover:animate-pulse" aria-hidden="true" />
+                            Fair-Screen Candidates
+                          </>
+                        )}
+                      </div>
+                    </button>
                   )}
-                >
-                  {!selectedCandidate ? null : (
-                    <div>
+                </div>
+              </div>
+
+              {applicantsError && (
+                <div className="m-5 rounded-tile border border-risk/35 bg-risk/12 p-3 text-xs text-risk">
+                  {applicantsError}
+                </div>
+              )}
+
+              {applicantsLoading && rankedApplicants.length === 0 ? (
+                <div className="m-5 flex items-center justify-center gap-2 rounded-tile border border-ink-600 bg-ink-850 p-6 text-sm text-mist-500">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Loading applicants...
+                </div>
+              ) : rankedApplicants.length === 0 ? (
+                <div className="m-5 rounded-tile border border-ink-600 bg-ink-850 p-4 text-sm text-mist-400">
+                  No applicants yet for this job.
+                </div>
+              ) : (
+                <div className="grid gap-0 lg:grid-cols-[1fr_1fr] xl:grid-cols-[1.15fr_0.85fr]">
+                  <div className="border-r border-ink-600 bg-ink-900 overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-ink-700 bg-ink-850/50 px-5 py-3">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-mist-500">Candidate</div>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-mist-500">Fair-Model Score</div>
+                    </div>
+
+                    {rankedApplicants.map((candidate) => {
+                      const isActive = candidate.id === selectedCandidateId;
+                      const isFairModel = candidate.scoreSource && candidate.scoreSource !== "heuristic";
+                      const scoreLabel = isFairModel
+                        ? (candidate.score >= 0.8 ? "Top Match" : candidate.score >= 0.6 ? "Good Match" : "Weak Match")
+                        : "Heuristic";
+                        
+                      return (
+                        <div
+                          key={candidate.id}
+                          className={cx(
+                            "group relative flex cursor-pointer items-center justify-between border-b border-ink-700 p-4 transition",
+                            isActive ? "bg-brand/10" : "bg-ink-900 hover:bg-ink-800"
+                          )}
+                          onClick={() => setSelectedCandidateId(candidate.id)}
+                        >
+                          {isActive && <div className="absolute bottom-0 left-0 top-0 w-1 bg-brand-hi" />}
+                          {!isActive && candidate.tone && (
+                             <div className={cx("absolute bottom-0 left-0 top-0 w-1", TONE_BAR_CLASS[candidate.tone])} />
+                          )}
+
+                          <div className="flex items-center gap-4 pl-2">
+                            <div className="w-4 text-xs font-bold text-mist-500">#{candidate.rank}</div>
+                            <div className={cx(
+                              "flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold shadow-md",
+                              isActive ? "bg-gradient-to-br from-brand to-brand-hi text-white" : "bg-ink-700 text-mist-300"
+                            )}>
+                              {candidate.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className={cx("text-sm font-bold", isActive ? "text-paper" : "text-mist-200")}>{candidate.name}</div>
+                              {candidate.verdict ? (
+                                 <div className="mt-1 flex items-center gap-2">
+                                  <span className={cx(
+                                    "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                                    candidate.verdict?.toLowerCase() === "shortlisted" ? "border-ok/20 bg-ok/10 text-ok" : "border-ink-600 bg-ink-800 text-mist-500"
+                                  )}>
+                                    {candidate.verdict}
+                                  </span>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 pr-2">
+                            <div className="flex flex-col items-end">
+                              <div className="flex items-baseline gap-1">
+                                <span className={cx("text-lg font-black", isActive ? "text-paper" : "text-mist-200")}>
+                                  {Math.round(candidate.score * 100)}
+                                </span>
+                                <span className={cx("text-xs font-bold", isActive ? "text-mist-500" : "text-mist-600")}>%</span>
+                              </div>
+                              <div className={cx(
+                                "text-[10px] font-semibold uppercase tracking-wider",
+                                isFairModel && candidate.score >= 0.8 ? "text-brand-hi" : isFairModel && candidate.score >= 0.6 ? "text-ok-hi" : "text-risk-hi"
+                              )}>
+                                {scoreLabel}
+                              </div>
+                            </div>
+                            <div className="relative h-10 w-10 shrink-0">
+                              <svg className="h-full w-full -rotate-90 transform">
+                                <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-ink-700" />
+                                <circle 
+                                  cx="20" 
+                                  cy="20" 
+                                  r="16" 
+                                  stroke="currentColor" 
+                                  strokeWidth="4" 
+                                  fill="transparent" 
+                                  strokeDasharray="100" 
+                                  strokeDashoffset={100 - Math.round(candidate.score * 100)} 
+                                  className={cx(
+                                    "transition-[stroke-dashoffset] duration-1000 ease-out", 
+                                    !isFairModel ? "text-brand" : candidate.score >= 0.8 ? "text-ok" : candidate.score >= 0.6 ? "text-raw" : "text-risk"
+                                  )}
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    className={cx(
+                      "flex flex-col",
+                      selectedCandidate?.tone === "positive"
+                        ? "bg-ok/10"
+                        : selectedCandidate?.tone === "negative"
+                          ? "bg-risk/10"
+                          : selectedCandidate?.tone === "mixed"
+                            ? "bg-raw/10"
+                            : "bg-ink-850"
+                    )}
+                  >
+                    {!selectedCandidate ? (
+                      <div className="flex min-h-[300px] flex-col items-center justify-center p-12 text-center">
+                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-ink-700 bg-ink-800 text-mist-600">
+                          <Users className="h-8 w-8" />
+                        </div>
+                        <h3 className="mb-1 text-sm font-bold text-mist-300">Select a candidate to view their details</h3>
+                      </div>
+                    ) : (
+                      <div className="p-6">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-base font-bold text-paper">{selectedCandidate.name}</div>

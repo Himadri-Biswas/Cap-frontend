@@ -13,6 +13,8 @@ import { cx } from "../../lib/cx.js";
 export default function Modal({ open, onClose, title, subtitle, children, footer, size = "md" }) {
   const panelRef = useRef(null);
   const returnFocusTo = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -34,7 +36,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
 
     const onKey = (event) => {
       if (event.key === "Escape") {
-        onClose?.();
+        onCloseRef.current?.();
         return;
       }
       if (event.key !== "Tab") return;
@@ -57,7 +59,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
       document.body.style.overflow = previousOverflow;
       returnFocusTo.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

@@ -160,7 +160,7 @@ export default function NewJobModal({ open, onClose, onCreated }) {
     }
   }
 
-  const canSubmit = form.title.trim() && form.dept.trim() && !submitting;
+  const canSubmit = form.title.trim() && form.dept.trim() && form.description.trim().length >= 40 && !submitting;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -197,8 +197,7 @@ export default function NewJobModal({ open, onClose, onCreated }) {
       open={open}
       onClose={handleClose}
       size="lg"
-      title="New job posting"
-      subtitle="This publishes immediately — applicants will see it on their Open roles page."
+      title="New Job Posting"
       footer={
         <div className="flex gap-2">
           <button
@@ -219,7 +218,7 @@ export default function NewJobModal({ open, onClose, onCreated }) {
                 Publishing…
               </span>
             ) : (
-              "Publish job posting"
+              "Publish Job Posting"
             )}
           </button>
         </div>
@@ -236,8 +235,13 @@ export default function NewJobModal({ open, onClose, onCreated }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Job title *" value={form.title} onChange={(v) => set("title", v)} />
           <Field label="Department *" value={form.dept} onChange={(v) => set("dept", v)} />
-          <Field label="Location" value={form.location} onChange={(v) => set("location", v)} />
-          <Field label="Application deadline" type="date" value={form.deadline} onChange={(v) => set("deadline", v)} />
+          <Select
+            label="Location *"
+            value={form.location}
+            onChange={(v) => set("location", v)}
+            options={["On-site", "Remote", "Hybrid"]}
+          />
+          <Field label="Application deadline *" type="date" value={form.deadline} onChange={(v) => set("deadline", v)} />
 
           <Select
             label="Employment type"
@@ -261,7 +265,7 @@ export default function NewJobModal({ open, onClose, onCreated }) {
         <div>
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">
-              Full job description
+              Full job description <span className="text-risk ml-0.5">*</span>
             </span>
             <div className="flex items-center gap-2">
               {jdExtracting && (
@@ -315,13 +319,19 @@ export default function NewJobModal({ open, onClose, onCreated }) {
             placeholder="Paste the full job description here, or upload a JD file above — skills are extracted automatically as you type."
             className="mt-2 w-full resize-none rounded-tile border border-ink-600 bg-ink-800 px-3 py-2.5 text-sm leading-6 text-paper outline-none transition placeholder:text-mist-600 focus:border-brand/35"
           />
+          <div className="mt-1.5 flex items-center justify-between px-0.5">
+            <span className={`text-[11px] font-medium tabular-nums ${form.description.length >= 40 ? "text-ok" : "text-mist-500"}`}>
+              {form.description.length} characters
+            </span>
+            <span className="text-[11px] text-mist-600">Minimum 40 characters</span>
+          </div>
 
           {/* Auto-extracted skills — no manual typing, no separate box */}
           <div className="mt-2 rounded-tile border border-ink-600 bg-ink-850 p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-mist-500">
                 <Sparkles className="h-3 w-3 text-brand-hi" aria-hidden="true" />
-                Required skills — extracted by Module 1
+                Required skills
               </span>
               {skillsExtracting && (
                 <span className="inline-flex items-center gap-1.5 text-[11px] text-mist-600">
@@ -368,24 +378,28 @@ export default function NewJobModal({ open, onClose, onCreated }) {
           </div>
         </div>
 
-        <div className="rounded-tile border border-brand/25 bg-brand/8 px-4 py-3 text-xs leading-5 text-mist-200">
-          Publishing sets the post to <span className="font-semibold">Open</span> and visible to every applicant
-          immediately. The card summary is generated from your description automatically.
-        </div>
+
       </div>
     </Modal>
   );
 }
 
 function Field({ label, value, onChange, type = "text", placeholder }) {
+  const isRequired = typeof label === "string" && label.endsWith("*");
+  const labelText = isRequired ? label.slice(0, -1).trim() : label;
+
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">
+        {labelText}
+        {isRequired && <span className="text-risk ml-0.5">*</span>}
+      </span>
       <input
         type={type}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        style={{ colorScheme: 'dark' }}
         className="mt-1.5 h-10 w-full rounded-tile border border-ink-600 bg-ink-800 px-3 text-sm text-paper outline-none transition placeholder:text-mist-600 focus:border-brand/35"
       />
     </label>
@@ -393,9 +407,15 @@ function Field({ label, value, onChange, type = "text", placeholder }) {
 }
 
 function Select({ label, value, onChange, options }) {
+  const isRequired = typeof label === "string" && label.endsWith("*");
+  const labelText = isRequired ? label.slice(0, -1).trim() : label;
+
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-mist-500">
+        {labelText}
+        {isRequired && <span className="text-risk ml-0.5">*</span>}
+      </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
