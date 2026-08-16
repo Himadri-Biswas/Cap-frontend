@@ -2355,16 +2355,48 @@ function JobPostsOnly({ jobs, search, setSearch, focusJobId = null, onJobsChange
                             </div>
                             <div>
                               <div className={cx("text-sm font-bold", isActive ? "text-paper" : "text-mist-200")}>{candidate.name}</div>
-                              {candidate.verdict ? (
-                                 <div className="mt-1 flex items-center gap-2">
-                                  <span className={cx(
-                                    "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                                    candidate.verdict?.toLowerCase() === "shortlisted" ? "border-ok/20 bg-ok/10 text-ok" : "border-ink-600 bg-ink-800 text-mist-500"
-                                  )}>
-                                    {candidate.verdict?.toLowerCase() === "shortlisted" ? "POTENTIALLY SHORTLISTED" : candidate.verdict?.toLowerCase() === "rejected" ? "POTENTIALLY REJECTED" : candidate.verdict}
-                                  </span>
-                                </div>
-                              ) : null}
+                              {(() => {
+                                // A real admin decision always outranks the AI's prediction — once
+                                // someone is actually shortlisted or rejected, say that plainly
+                                // instead of still hedging with "potentially".
+                                const decided = candidate.status === "shortlisted" || candidate.status === "rejected";
+                                if (decided) {
+                                  const isShortlisted = candidate.status === "shortlisted";
+                                  return (
+                                    <div className="mt-1 flex items-center gap-2">
+                                      <span
+                                        className={cx(
+                                          "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                                          isShortlisted ? "border-ok/40 bg-ok/20 text-ok" : "border-risk/40 bg-risk/20 text-risk"
+                                        )}
+                                      >
+                                        {isShortlisted ? "Shortlisted" : "Rejected"}
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                                if (!candidate.verdict) return null;
+                                const predicted = aiVerdict(candidate.score);
+                                const label =
+                                  predicted.label === "SHORTLISTED" || predicted.label === "HIGHLY PROBABLE"
+                                    ? "Predicted Shortlist"
+                                    : predicted.label === "REJECTED"
+                                      ? "Predicted Reject"
+                                      : predicted.label; // "WEAK MATCH" — genuinely borderline, not a clear lean either way
+                                const tone =
+                                  label === "Predicted Shortlist"
+                                    ? "border-dashed border-ok/40 bg-transparent text-ok"
+                                    : label === "Predicted Reject"
+                                      ? "border-dashed border-risk/40 bg-transparent text-risk"
+                                      : "border-dashed border-ink-500 bg-transparent text-mist-500";
+                                return (
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <span className={cx("inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide", tone)}>
+                                      {label}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
 
@@ -2505,7 +2537,7 @@ function JobPostsOnly({ jobs, search, setSearch, focusJobId = null, onJobsChange
                                 STATUS_STYLE[selectedCandidate.status] || STATUS_STYLE.submitted
                               )}
                             >
-                              {selectedCandidate.status.replace(/_/g, " ")}
+                              CV {selectedCandidate.status.replace(/_/g, " ")}
                             </span>
                           </div>
                         </div>
