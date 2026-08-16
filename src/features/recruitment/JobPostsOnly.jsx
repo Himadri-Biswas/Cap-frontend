@@ -2363,7 +2363,7 @@ function JobPostsOnly({ jobs, search, setSearch, focusJobId = null, onJobsChange
                                     "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
                                     candidate.verdict?.toLowerCase() === "shortlisted" ? "border-ok/20 bg-ok/10 text-ok" : "border-ink-600 bg-ink-800 text-mist-500"
                                   )}>
-                                    {candidate.verdict}
+                                    {candidate.verdict?.toLowerCase() === "shortlisted" ? "POTENTIALLY SHORTLISTED" : candidate.verdict?.toLowerCase() === "rejected" ? "POTENTIALLY REJECTED" : candidate.verdict}
                                   </span>
                                 </div>
                               ) : null}
