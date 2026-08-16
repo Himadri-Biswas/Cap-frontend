@@ -2023,7 +2023,7 @@ function JobPostsOnly({ jobs, search, setSearch, focusJobId = null, onJobsChange
                           >
                             {applicant.status === "shortlisted" && <ThumbsUp className="h-3 w-3" aria-hidden="true" />}
                             {applicant.status === "rejected" && <ThumbsDown className="h-3 w-3" aria-hidden="true" />}
-                            {applicant.status.replace(/_/g, " ")}
+                            {`cv ${applicant.status.replace(/_/g, " ")}`}
                           </span>
 
                           <div className="flex gap-2">
