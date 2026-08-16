@@ -2021,8 +2021,6 @@ function JobPostsOnly({ jobs, search, setSearch, focusJobId = null, onJobsChange
                               STATUS_STYLE[applicant.status] || STATUS_STYLE.submitted
                             )}
                           >
-                            {applicant.status === "shortlisted" && <ThumbsUp className="h-3 w-3" aria-hidden="true" />}
-                            {applicant.status === "rejected" && <ThumbsDown className="h-3 w-3" aria-hidden="true" />}
                             {`cv ${applicant.status.replace(/_/g, " ")}`}
                           </span>
 
